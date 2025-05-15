@@ -28,3 +28,5 @@ VERSION
 
 # mac preview
 .DS_Store
+go.mod
+go.sum
