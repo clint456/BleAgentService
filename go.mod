@@ -6,6 +6,7 @@ require (
 	github.com/edgexfoundry/device-sdk-go/v3 v3.1.1
 	github.com/edgexfoundry/go-mod-core-contracts/v3 v3.1.0
 	github.com/spf13/cast v1.5.1
+	github.com/stretchr/testify v1.10.0
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 )
 
@@ -61,7 +62,6 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
