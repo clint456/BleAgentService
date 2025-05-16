@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	serviceName string = "device-uart"
+	serviceName string = "device-ble"
 )
 
 func main() {
-	d := driver.Driver{}
+	d := driver.BleDriver{}
 	startup.Bootstrap(serviceName, device.Version, &d)
 }

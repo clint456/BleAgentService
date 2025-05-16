@@ -19,7 +19,7 @@
 //
 //
 
-package driver
+package demo
 
 import (
 	"encoding/binary"
@@ -162,14 +162,14 @@ func (s *Driver) HandleWriteCommands(deviceName string, protocols map[string]mod
 
 	var deviceLocation string
 	var baudRate int
-
+	// 读取多个uart设备名、波特率信息
 	for i, protocol := range protocols {
 		deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
 		baudRate, _ = cast.ToIntE(protocol["baudRate"])
 
 		s.lc.Debugf("Driver.HandleWriteCommands(): protocol = %v, device location = %v, baud rate = %v", i, deviceLocation, baudRate)
 	}
-
+	// 分别处理各个uart设备指令操作
 	for i, req := range reqs {
 		s.lc.Debugf("Driver.HandleWriteCommands(): deviceResourceName = %v", req.DeviceResourceName)
 		s.lc.Debugf("Driver.HandleWriteCommands(): protocols: %v, resource: %v, attribute: %v, parameters: %v", protocols, req.DeviceResourceName, req.Attributes, params)

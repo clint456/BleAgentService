@@ -17,7 +17,7 @@
 //
 //
 
-package driver
+package demo
 
 import (
 	"io"

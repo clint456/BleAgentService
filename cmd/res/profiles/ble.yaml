@@ -1,0 +1,32 @@
+name: "Uart-ble-Device"
+manufacturer: "edgex"
+model: "edgex-uart"
+labels:
+- "device-ble-example"
+description: "Example of Device_ble_uart"
+
+deviceResources:
+-
+    name: "ble_init"
+    isHidden: false
+    description: "Ble Moudle start/stop(true:start / false:stop)"
+    attributes: { type: "ble", maxbytes: 160, timeout: 1}
+    properties:
+        valueType: "Bool"
+        readWrite: "RW"
+-
+    name: "ble_send"
+    isHidden: false
+    description: "Ble Moudle Send Data(String)"
+    attributes: { type: "ble", maxbytes: 160, timeout: 1}
+    properties:
+        valueType: "String"
+        readWrite: "RW"
+-
+    name: "ble_receive"
+    isHidden: false
+    description: "Ble Moudle receive Data(String)"
+    attributes: { type: "ble", maxbytes: 160, timeout: 1}
+    properties:
+        valueType: "String"
+        readWrite: "RW"
