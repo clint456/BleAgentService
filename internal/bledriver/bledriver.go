@@ -191,7 +191,7 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 			at := AtCommand{}
 			var info string
 			var er error
-			info, er = at.AtCommandSend("OK", s.uart[deviceLocation], s.lc) //重置
+			info, er = at.AtCommandSend("OK\r\n", s.uart[deviceLocation], s.lc) //重置
 			s.lc.Debugf("5555555555555555555555555555555555555555555555555555")
 			s.lc.Debugf("ATCommand的結果是:%v , error:%v ", info, er)
 			// 判断是上面设备操作类型

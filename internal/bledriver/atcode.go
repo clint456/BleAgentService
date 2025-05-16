@@ -1,9 +1,9 @@
 package bledriver
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v3/clients/logger"
 )
@@ -40,17 +40,9 @@ type AtCommand struct {
 
 func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient) (string, error) {
 	var err error
-	var txbuf []byte
-	// 转换为字节切片
-	bytes := []byte(code)
-	// 编码为十六进制字符串
-	hexStr := hex.EncodeToString(bytes)
-	txbuf, err = hex.DecodeString(hexStr)
-	if err != nil {
-		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): String decode failed: %v", err)
-	}
-	// 写入状态查询AT指令
-	txlen, err := u.UartWrite(txbuf, lc)
+
+	// 写入状态查询AT指令 (使用切片发送)
+	txlen, err := u.UartWrite([]byte(code), lc)
 	if err != nil {
 		lc.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
@@ -61,9 +53,10 @@ func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient)
 	//
 	//
 	//
+	time.Sleep(300 * time.Millisecond)
 
 	// 读取Ble模块回显值
-	if err := u.UartRead(160, lc); err != nil { // 串口读值有错误
+	if err := u.UartRead(108, lc); err != nil { // 串口读值有错误
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
 	}
 	// 读值无错误
