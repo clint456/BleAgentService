@@ -1,4 +1,4 @@
-package driver
+package bledriver
 
 import (
 	"io"
@@ -55,10 +55,10 @@ func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
 	var buf []byte
 
 	// serial包方法 一次读取的最大值为16byte
-	// 对做取余处理
+	// 分包读取
 	readCount := (maxbytes / 16) + 1
 
-	lc.Debugf("UartRead(): 串口 读值长度为: %v", readCount)
+	lc.Debugf("UartRead(): 串口 每次读值长度为: %v", readCount)
 
 	if dev.portStatus {
 		lc.Errorf("UartRead():  Exit - Device busy... Read request dropped for %s", dev.config.Name)

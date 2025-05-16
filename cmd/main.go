@@ -11,7 +11,7 @@ import (
 	"github.com/edgexfoundry/device-sdk-go/v3/pkg/startup"
 
 	"github.com/edgexfoundry/device-uart"
-	"github.com/edgexfoundry/device-uart/internal/driver"
+	"github.com/edgexfoundry/device-uart/internal/bledriver"
 )
 
 const (
@@ -19,6 +19,6 @@ const (
 )
 
 func main() {
-	d := driver.BleDriver{}
+	d := bledriver.BleDriver{}
 	startup.Bootstrap(serviceName, device.Version, &d)
 }

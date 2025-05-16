@@ -1,7 +1,10 @@
-package BleBleDriver
+package bledriver
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/edgexfoundry/device-sdk-go/v3/pkg/interfaces"
 	dsModels "github.com/edgexfoundry/device-sdk-go/v3/pkg/models"
@@ -32,12 +35,12 @@ func (s *BleDriver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 
 // 在 SDK 完成初始化后，启动运行设备服务启动任务初始化。
 // 这允许设备服务安全地使用 DeviceServiceSDK接口
-
 func (s *BleDriver) start() error {
 	return nil
 }
 
 // HandleReadCommands 被指定设备的协议读取操作触发。
+// HandleReadCommands triggers a protocol Read operation for the specified device.
 func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
 
 	const castError = "Failed to parse %s reading: %v"
@@ -52,25 +55,78 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 		deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
 		baudRate, _ = cast.ToIntE(protocol["baudRate"])
 
-		s.lc.Debugf("BleBleDriver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v", i, deviceLocation, baudRate)
+		s.lc.Debugf("Driver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v", i, deviceLocation, baudRate)
 	}
 
 	for i, req := range reqs {
-		s.lc.Debugf("BleBleDriver.HandleReadCommands(): protocols: %v resource: %v attributes: %v", protocols, req.DeviceResourceName, req.Attributes)
+		s.lc.Debugf("Driver.HandleReadCommands(): protocols: %v resource: %v attributes: %v", protocols, req.DeviceResourceName, req.Attributes)
 
 		// Get the value type from device profile
 		valueType := req.Type
-		s.lc.Debugf("BleBleDriver.HandleReadCommands(): value type = %v", valueType)
+		s.lc.Debugf("Driver.HandleReadCommands(): value type = %v", valueType)
 
 		key_type_value := fmt.Sprintf("%v", req.Attributes["type"])
 
 		if key_type_value == "ble" {
-			//TODO
+			key_maxbytes_value, _ := cast.ToIntE(req.Attributes["maxbytes"])
+			key_timeout_value, _ := cast.ToIntE(req.Attributes["timeout"])
 
+			// check device is already initialized
+			if _, ok := s.uart[deviceLocation]; ok {
+				s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
+			} else {
+				// initialize device for the first time
+				s.uart[deviceLocation], _ = NewUart(deviceLocation, baudRate, key_timeout_value, s.lc)
+				s.uart[deviceLocation].rxbuf = nil
+
+				s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
+			}
+
+			if err := s.uart[deviceLocation].UartRead(key_maxbytes_value, s.lc); err != nil {
+				return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
+			}
+
+			rxbuf := hex.EncodeToString(s.uart[deviceLocation].rxbuf)
+			s.lc.Debugf("Driver.HandleReadCommands(): Received Data = %s", rxbuf)
+
+			// Pass the received values to higher layers
+			// Handle data based on the value type mentioned in device profile
+			var cv *dsModels.CommandValue
+			switch valueType {
+			case common.ValueTypeInt8:
+				value, err := strconv.ParseInt(rxbuf, 16, 8)
+				if err != nil {
+					return nil, fmt.Errorf(castError, req.DeviceResourceName, err)
+				}
+				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, int8(value))
+				if err != nil {
+					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+				}
+			case common.ValueTypeInt16:
+				value, err := strconv.ParseInt(rxbuf, 16, 16)
+				if err != nil {
+					return nil, fmt.Errorf(castError, req.DeviceResourceName, err)
+				}
+				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, int16(value))
+				if err != nil {
+					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+				}
+			case common.ValueTypeString:
+				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
+				if err != nil {
+					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+				}
+			default:
+				return nil, fmt.Errorf("Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
+			}
+
+			s.uart[deviceLocation].rxbuf = nil
+			res[i] = cv
+			s.lc.Debugf("Driver.HandleReadCommands(): Response = %v", res[i])
 		}
-
 	}
-	return nil, nil
+
+	return res, nil
 }
 
 // HandleWriteCommands 传递一个 CommandRequest 结构片段，每个片段代表特定设备资源的资源操作。
@@ -110,46 +166,70 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 				value, err = params[i].StringValue()
 			default:
 				return fmt.Errorf("BleBleDriver.HandleWriteCommands(): Unsupported value type: %v", valueType)
-
 			}
 			if err != nil {
 				return err
 			}
 			s.lc.Debugf("BleDriver.HandleWriteCommands(): %s= %v", valueType, value)
-			//反射接口转化为具体数据类型值
-			key_value, err := cast.ToStringE(req.DeviceResourceName)
+
 			key_timeout_value, err := cast.ToIntE(req.Attributes["timeout"])
 			if err != nil {
 				return err
 			}
-			//判断蓝牙是否初始化，否则进行初始化
-			if(s.uart)
-			// 判断是上面设备操作类型
-			switch key_value {
-			case "ble_send":
-				s.ble_send()
-			case "ble_receive":
-				s.ble_receive()
-		}
 
+			//判断串口设备对象是否创建
+			if _, ok := s.uart[deviceLocation]; !ok {
+				s.uart[deviceLocation], err = NewUart(deviceLocation, baudRate, key_timeout_value, s.lc)
+				if err != nil {
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): 串口设备对象 创建失败：%v", err)
+				}
+			}
+			//TODO 判断设备初始化状态
+			at := AtCommand{}
+			// 判断是上面设备操作类型
+			switch req.DeviceResourceName {
+			case "ble_init":
+				at.AtCommandSend(ATRESET, s.uart[deviceLocation], s.lc) //重置
+
+			case "ble_send":
+
+			case "ble_receive":
+			default:
+				s.lc.Errorf("BleDriver.HandleWriteCommands(): %s= %v", valueType, value)
+			}
+		}
 	}
 	return nil
 }
-func (s *BleDriver) ble_state() bool,error{
 
-	return true, nil
-}
-func (s *BleDriver) ble_init() error {
-
-	return nil
-}
-
-func (s *BleDriver) ble_send() error {
-
-	return nil
+// Discover triggers protocol specific device discovery, asynchronously writes
+// the results to the channel which is passed to the implementation via
+// ProtocolDriver.Initialize()
+func (s *BleDriver) Discover() error {
+	return fmt.Errorf("Discover function is yet to be implemented!")
 }
 
-func (s *BleDriver) ble_receive() error {
+// ValidateDevice triggers device's protocol properties validation, returns error
+// if validation failed and the incoming device will not be added into EdgeX
+func (s *BleDriver) ValidateDevice(device models.Device) error {
+	protocol, ok := device.Protocols["UART"]
+	if !ok {
+		return errors.New("Missing 'UART' protocols")
+	}
+
+	deviceLocation, ok := protocol["deviceLocation"]
+	if !ok {
+		return errors.New("Missing 'deviceLocation' information")
+	} else if deviceLocation == "" {
+		return errors.New("deviceLocation must not empty")
+	}
+
+	baudRate, ok := protocol["baudRate"]
+	if !ok {
+		return errors.New("Missing 'baudRate' information")
+	} else if baudRate == "" {
+		return errors.New("baudRate must not empty")
+	}
 
 	return nil
 }
