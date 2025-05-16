@@ -35,7 +35,7 @@ func (s *BleDriver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 
 // 在 SDK 完成初始化后，启动运行设备服务启动任务初始化。
 // 这允许设备服务安全地使用 DeviceServiceSDK接口
-func (s *BleDriver) start() error {
+func (s *BleDriver) Start() error {
 	return nil
 }
 
@@ -151,7 +151,7 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 		// Get the value type from device profile
 		valueType := req.Type
 		s.lc.Debugf("BleBleDriver.HandleWriteCommands(): value type = %v", valueType)
-
+		s.lc.Debugf("11111111111111111111111111111111111111111111111")
 		var value interface{}
 		var err error
 
@@ -167,16 +167,18 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 			default:
 				return fmt.Errorf("BleBleDriver.HandleWriteCommands(): Unsupported value type: %v", valueType)
 			}
+			s.lc.Debugf("2222222222222222222222222222222222222222222")
 			if err != nil {
 				return err
 			}
+			s.lc.Debugf("3333333333333333333333333333333333333333")
 			s.lc.Debugf("BleDriver.HandleWriteCommands(): %s= %v", valueType, value)
 
 			key_timeout_value, err := cast.ToIntE(req.Attributes["timeout"])
 			if err != nil {
 				return err
 			}
-
+			s.lc.Debugf("44444444444444444444444444444444444444")
 			//判断串口设备对象是否创建
 			if _, ok := s.uart[deviceLocation]; !ok {
 				s.uart[deviceLocation], err = NewUart(deviceLocation, baudRate, key_timeout_value, s.lc)
@@ -184,19 +186,24 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): 串口设备对象 创建失败：%v", err)
 				}
 			}
+
 			//TODO 判断设备初始化状态
 			at := AtCommand{}
+			var info string
+			var er error
+			info, er = at.AtCommandSend("OK", s.uart[deviceLocation], s.lc) //重置
+			s.lc.Debugf("5555555555555555555555555555555555555555555555555555")
+			s.lc.Debugf("ATCommand的結果是:%v , error:%v ", info, er)
 			// 判断是上面设备操作类型
-			switch req.DeviceResourceName {
-			case "ble_init":
-				at.AtCommandSend(ATRESET, s.uart[deviceLocation], s.lc) //重置
+			// switch req.DeviceResourceName {
+			// case "ble_init":
 
-			case "ble_send":
+			// case "ble_send":
 
-			case "ble_receive":
-			default:
-				s.lc.Errorf("BleDriver.HandleWriteCommands(): %s= %v", valueType, value)
-			}
+			// case "ble_receive":
+			// default:
+			// 	s.lc.Errorf("BleDriver.HandleWriteCommands(): %s= %v", valueType, value)
+			// }
 		}
 	}
 	return nil

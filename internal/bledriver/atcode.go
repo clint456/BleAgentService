@@ -41,7 +41,11 @@ type AtCommand struct {
 func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient) (string, error) {
 	var err error
 	var txbuf []byte
-	txbuf, err = hex.DecodeString(code)
+	// 转换为字节切片
+	bytes := []byte(code)
+	// 编码为十六进制字符串
+	hexStr := hex.EncodeToString(bytes)
+	txbuf, err = hex.DecodeString(hexStr)
 	if err != nil {
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): String decode failed: %v", err)
 	}
@@ -63,10 +67,11 @@ func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient)
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
 	}
 	// 读值无错误
-	rxbuf := hex.EncodeToString(u.rxbuf)
-	if !strings.Contains(rxbuf, "OK") { // 蓝牙回显不OK
-		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): 蓝牙回显错误: %v", rxbuf)
+	_str := string(u.rxbuf)
+
+	if !strings.Contains(_str, "OK") { // 蓝牙回显不OK
+		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): 蓝牙回显错误: %v", _str)
 	}
 
-	return rxbuf, err
+	return _str, err
 }
