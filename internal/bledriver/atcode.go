@@ -56,15 +56,17 @@ func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient)
 	time.Sleep(300 * time.Millisecond)
 
 	// 读取Ble模块回显值
-	if err := u.UartRead(108, lc); err != nil { // 串口读值有错误
+	if err := u.UartRead(16, lc); err != nil { // 串口读值有错误
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
 	}
 	// 读值无错误
 	_str := string(u.rxbuf)
-
+	lc.Debugf("AtCommandSend(): 读取的回显值为： %v", _str)
 	if !strings.Contains(_str, "OK") { // 蓝牙回显不OK
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): 蓝牙回显错误: %v", _str)
 	}
+	// 清空 rxbuf 以准备下一次读取（可选）
+	u.rxbuf = nil
 
 	return _str, err
 }
