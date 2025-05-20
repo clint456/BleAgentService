@@ -191,9 +191,42 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 			at := AtCommand{}
 			var info string
 			var er error
-			info, er = at.AtCommandSend("OK\r\n", s.uart[deviceLocation], s.lc) //重置
-			s.lc.Debugf("5555555555555555555555555555555555555555555555555555")
-			s.lc.Debugf("ATCommand的結果是:%v , error:%v ", info, er)
+			info, er = at.AtCommandSend(ATRESET, s.uart[deviceLocation], s.lc) //重置
+			s.lc.Debugf("======================================= ATCommand: %v  的结果是:%v , error:%v ", ATRESET,info, er)
+
+			info, er = at.AtCommandSend(ATVERSION, s.uart[deviceLocation], s.lc) //重置
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATVERSION,info, er)
+
+			info, er = at.AtCommandSend(ATINIT_2, s.uart[deviceLocation], s.lc) //重置
+
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATINIT_2,info, er)
+
+			info, er = at.AtCommandSend(ATADV, s.uart[deviceLocation], s.lc) //重置
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATADV,info, er)
+
+			info, er = at.AtCommandSend(ATGATTSSRV, s.uart[deviceLocation], s.lc) //重置
+
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATGATTSSRV,info, er)
+
+			info, er = at.AtCommandSend(ATGATTSCHAR, s.uart[deviceLocation], s.lc) //重置
+	
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATGATTSCHAR,info, er)
+
+			info, er = at.AtCommandSend(ATGATTSSRVDONE, s.uart[deviceLocation], s.lc) //重置
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATGATTSSRVDONE,info, er)
+
+			info, er = at.AtCommandSend(ATNAME, s.uart[deviceLocation], s.lc) //重置
+	
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATNAME,info, er)
+
+			info, er = at.AtCommandSend(ATADDR, s.uart[deviceLocation], s.lc) //重置
+
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATADDR,info, er)
+
+			info, er = at.AtCommandSend(ATADVSTART, s.uart[deviceLocation], s.lc) //重置
+
+			s.lc.Debugf("=======================================ATCommand: %v  的结果是:%v , error:%v ", ATADVSTART,info, er)
+
 			// 判断是上面设备操作类型
 			// switch req.DeviceResourceName {
 			// case "ble_init":

@@ -56,7 +56,7 @@ func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient)
 	time.Sleep(300 * time.Millisecond)
 
 	// 读取Ble模块回显值
-	if err := u.UartRead(16, lc); err != nil { // 串口读值有错误
+	if err := u.UartRead(128, lc); err != nil { // 串口读值有错误
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
 	}
 	// 读值无错误

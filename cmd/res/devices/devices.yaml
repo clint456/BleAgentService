@@ -8,7 +8,7 @@ deviceList:
       - uart-ble-device
     protocols:
       UART:
-        deviceLocation: "/dev/ttyUSB0"
+        deviceLocation: "/dev/ttyS3"
         baudRate: 115200
     # autoEvents:
     #   - Interval: 20s

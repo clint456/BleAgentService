@@ -58,8 +58,6 @@ func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
 	// 分包读取
 	readCount := (maxbytes / 16) + 1
 
-	lc.Debugf("UartRead(): 串口 每次读值长度为: %v", readCount)
-
 	if dev.portStatus {
 		lc.Errorf("UartRead():  Exit - Device busy... Read request dropped for %s", dev.config.Name)
 		return nil
