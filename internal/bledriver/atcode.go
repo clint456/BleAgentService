@@ -3,7 +3,7 @@ package bledriver
 import (
 	"fmt"
 	"strings"
-	"time"
+	//"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v3/clients/logger"
 )

@@ -96,7 +96,7 @@ func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
 		}
 
 		// 记录调试日志，显示本次读取的字节长度和具体数据内容
-		lc.Debugf("UartRead(): 读取长度为 = %v, 值为 = %s", lens, b)
+		// lc.Debugf("UartRead(): 读取长度为 = %v, 值为 = %s", lens, b)
 
 		// 将读取到的数据（b[:lens]）追加到临时缓冲区 buf 中
 		// 使用切片 b[:lens] 确保只追加实际读取的字节
