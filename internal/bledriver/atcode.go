@@ -47,16 +47,16 @@ func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient)
 		lc.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
 	}
-	lc.Debugf("AtCommandSend(): AT指令已写入串口 length = %v", txlen)
+	lc.Debugf("AtCommandSend(): AT指令 %v 已写入串口 length = %v",code, txlen)
 
 	//TODO 可能在这里需要加上 300毫秒延时，视情况而定
 	//
 	//
 	//
-	time.Sleep(300 * time.Millisecond)
+	// time.Sleep(300 * time.Millisecond)
 
 	// 读取Ble模块回显值
-	if err := u.UartRead(128, lc); err != nil { // 串口读值有错误
+	if err := u.UartRead(128, lc); err != nil {
 		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
 	}
 	// 读值无错误
