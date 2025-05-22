@@ -42,7 +42,6 @@ func (s *BleDriver) Start() error {
 }
 
 // HandleReadCommands 被指定设备的协议读取操作触发。
-// HandleReadCommands triggers a protocol Read operation for the specified device.
 func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
 
 	const castError = "Failed to parse %s reading: %v"
@@ -84,7 +83,7 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
 			}
 
-			if err := s.uart[deviceLocation].UartRead(key_maxbytes_value, s.lc); err != nil {
+			if err := s.uart[deviceLocation].UartRead(key_maxbytes_value); err != nil {
 				return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
 			}
 
