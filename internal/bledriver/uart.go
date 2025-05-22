@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/edgexfoundry/go-mod-core-contracts/v3/clients/logger"
 	"github.com/tarm/serial"
 )
 
@@ -25,7 +24,7 @@ type Uart struct {
 
 // 传入：设备名、波特率
 // 返回：Uart结构体指针
-func NewUart(dev string, baud int, timeout int, lc logger.LoggingClient) (*Uart, error) {
+func NewUart(dev string, baud int, timeout int) (*Uart, error) {
 	config := &serial.Config{
 		Name:        dev,
 		Baud:        baud,
@@ -36,7 +35,6 @@ func NewUart(dev string, baud int, timeout int, lc logger.LoggingClient) (*Uart,
 	//尝试开启串口,成功返回(*serial.Port,nill),失败返回(nill,error)
 	conn, err := serial.OpenPort(config)
 	if err != nil || conn == nil {
-		lc.Errorf("NewUart(): Exit - 开启 %s 串口失败 : %v", config.Name, err)
 		return nil, err
 
 	}
@@ -46,9 +44,8 @@ func NewUart(dev string, baud int, timeout int, lc logger.LoggingClient) (*Uart,
 
 // 传入：读取串口缓冲取到rxbuf中
 // 返回： error类或nil
-func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
+func (dev *Uart) UartRead(maxbytes int) error {
 	if !dev.enable {
-		lc.Errorf("UartRead(): 串口 %s 未开启！！！", dev.config.Name)
 		return nil
 	}
 
@@ -59,7 +56,6 @@ func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
 	readCount := (maxbytes / 16) + 1
 
 	if dev.portStatus {
-		lc.Errorf("UartRead():  Exit - Device busy... Read request dropped for %s", dev.config.Name)
 		return nil
 	}
 
@@ -77,13 +73,10 @@ func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
 		if err != nil {
 			// 如果错误是文件结束（EOF），表示数据读取完成
 			if err == io.EOF {
-				// 记录调试日志，提示成功读取到文件末尾
-				lc.Debugf("UartRead(): %v - 完成读值!", err)
 				// 跳出循环，结束读取
 				break
 			}
 			// 对于其他类型的错误，记录错误日志
-			lc.Errorf("UartRead(): Exit - Error = %v", err)
 
 			// 将设备端口状态设置为不可用（false）
 			dev.portStatus = false
@@ -106,15 +99,11 @@ func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
 		// 这里使用了 buf[:] 确保追加整个缓冲区内容
 		dev.rxbuf = append(dev.rxbuf, buf[:]...)
 
-		// 记录调试日志，显示设备接收缓冲区的当前内容
-		lc.Debugf("UartRead(): dev.rxbuf = %s", dev.rxbuf)
-
 		// 清空临时缓冲区 buf，为下一次读取做准备
 		buf = nil
 	}
 	dev.portStatus = false
 	dev.conn.Flush()
-	lc.Debugf("UartRead(): Exit - Success")
 
 	return nil
 }
@@ -127,7 +116,7 @@ func (dev *Uart) UartRead(maxbytes int, lc logger.LoggingClient) error {
 // 返回值：
 //   - int: 成功写入的字节数
 //   - error: 写入过程中发生的错误（如果有）
-func (dev *Uart) UartWrite(txbuf []byte, lc logger.LoggingClient) (int, error) {
+func (dev *Uart) UartWrite(txbuf []byte) (int, error) {
 	// 清空串口连接的输入和输出缓冲区，确保无残留数据干扰本次写入
 	dev.conn.Flush()
 
@@ -142,9 +131,6 @@ func (dev *Uart) UartWrite(txbuf []byte, lc logger.LoggingClient) (int, error) {
 		// 返回 0 表示无字节写入，并附带错误
 		return 0, err
 	}
-
-	// 记录调试日志，显示成功写入的字节数
-	lc.Debugf("UartWrite(): Number of bytes transmitted = %d\n", length)
 
 	// 返回写入的字节数和错误（此时 err 为 nil）
 	return length, err

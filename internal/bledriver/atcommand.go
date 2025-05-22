@@ -20,80 +20,124 @@ const (
 	Disconnected  BleStatus = "DISCONNECTED"
 )
 
+type BleCommand string
+
 const (
-	ATRESET        = "AT+QRST\r\n"
-	ATVERSION      = "AT+QVERSION\r\n"
-	ATINIT_1       = "AT+QBLEINIT=1\r\n"           //初始化BLE的中心设备
-	ATINIT_2       = "AT+QBLEINIT=2\r\n"           //作为外围设备初始化
-	ATINIT_4       = "AT+QBLEINIT=4\r\n"           //设备初始化为多连接
-	ATADV          = "AT+QBLEADVPARAM=150,150\r\n" //设置 BLE 广播参数
-	ATGATTSSRV     = "AT+QBLEGATTSSRV=fff1\r\n"
-	ATGATTSCHAR    = "AT+QBLEGATTSCHAR=fff2\r\n"
-	ATGATTSSRVDONE = "AT+QBLEGATTSSRVDONE\r\n"
-	ATNAME         = "AT+QBLENAME=QuecHCM111Z\r\n"
-	ATADDR         = "AT+QBLEADDR?\r\n"
-	ATADVSTART     = "AT+QBLEADVSTART\r\n"
-	ATSTATE        = "AT+QBLESTAT\r\n"
+	// init
+	ATRESET        BleCommand = "AT+QRST\r\n"
+	ATVERSION      BleCommand = "AT+QVERSION\r\n"
+	ATINIT_1       BleCommand = "AT+QBLEINIT=1\r\n"           //初始化BLE的中心设备
+	ATINIT_2       BleCommand = "AT+QBLEINIT=2\r\n"           //作为外围设备初始化
+	ATINIT_4       BleCommand = "AT+QBLEINIT=4\r\n"           //设备初始化为多连接
+	ATADV          BleCommand = "AT+QBLEADVPARAM=150,150\r\n" //设置 BLE 广播参数
+	ATGATTSSRV     BleCommand = "AT+QBLEGATTSSRV=fff1\r\n"
+	ATGATTSCHAR    BleCommand = "AT+QBLEGATTSCHAR=fff2\r\n"
+	ATGATTSSRVDONE BleCommand = "AT+QBLEGATTSSRVDONE\r\n"
+	ATNAME         BleCommand = "AT+QBLENAME=QuecHCM111Z\r\n"
+	ATADDR         BleCommand = "AT+QBLEADDR?\r\n"
+	ATADVSTART     BleCommand = "AT+QBLEADVSTART\r\n"
+
+	//query
+	ATSTATE BleCommand = "AT+QBLESTAT\r\n" // 查询设备状态
+
+	// send
+	GATTSNTFY BleCommand = "AT+QBLEGATTSNTFY=0,fff2"
 )
-s
+
 type AtCommand struct {
-	state   *BleStatus
+	state   BleStatus
 	at_uart *Uart
+	command BleCommand
+	lc      logger.LoggingClient
 }
 
-// 工厂函数
-func NewAtCommand(at_uart *Uart) *AtCommand{
-	state := AtState()
+// 构造AtCommand的工厂函数
+func NewAtCommand(at_uart *Uart, lc logger.LoggingClient) *AtCommand {
+	state, _ := CheckAtState(at_uart) //检查当前Ble状态
+	lc.Debug("当前BLE设备状态为:%v", state)
 	return &AtCommand{
-		state: ,
-		at
+		state:   state,
+		at_uart: at_uart,
+		lc:      lc,
 	}
 }
 
-func (a *AtCommand) BleInit(lc logger.LoggingClient) (string, error) {
-	var info string
-	var er error
-	info, er = a.AtCommandSend(ATRESET, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATRESET, info, er)
+// BLE初始化为外围连接设备(模式2)，并开启广播
+func (a *AtCommand) BleInit_2() error {
+	// if a.state == Uninitialized {
+	// 	return fmt.Errorf("未初始化BLE模块")
+	// }
 
-	info, er = a.AtCommandSend(ATVERSION, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATVERSION, info, er)
+	// TODO
+	// 可以根据当前设备状态来决定前面几个命令需不要
+	// 目前暂时就这样吧
 
-	info, er = a.AtCommandSend(ATINIT_2, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATINIT_2, info, er)
+	// 定义命令切片
+	commands := []BleCommand{
+		ATRESET,
+		ATVERSION,
+		ATINIT_2,
+		ATADV,
+		ATGATTSSRV,
+		ATGATTSCHAR,
+		ATGATTSSRVDONE,
+		ATNAME,
+		ATADDR,
+		ATADVSTART,
+	}
 
-	info, er = a.AtCommandSend(ATADV, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATADV, info, er)
+	var lastErr error
 
-	info, er = a.AtCommandSend(ATGATTSSRV, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATGATTSSRV, info, er)
+	// 使用循环发送命令
+	for _, cmd := range commands {
+		_, info, err := AtCommandSend(cmd, a.at_uart)
+		a.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v 的结果是:%v , error:%v ", cmd, info, err)
+		if err != nil {
+			lastErr = err // 保存最后一次的错误（如果有）
+			// 可以选择在这里中断循环，或者继续执行其他命令
+			a.lc.Errorf("!!!!!!!!!!!!!!!!!!!!! ATCommand: %v 出现错误: %v ,输出为: %v", cmd, err, info)
+			// 这里选择抛出错误并继续执行所有命令，保留最后一次的错误
+		}
+	}
+	return lastErr
+}
 
-	info, er = a.AtCommandSend(ATGATTSCHAR, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATGATTSCHAR, info, er)
+func (a *AtCommand) BleSend(meg string) error {
+	// 检查内容是否为空
+	if meg == "" {
+		return fmt.Errorf("发送内容不能为空")
+	}
 
-	info, er = a.AtCommandSend(ATGATTSSRVDONE, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATGATTSSRVDONE, info, er)
+	// 验证设备状态
+	switch a.state {
+	case Uninitialized:
+		return fmt.Errorf("BLE设备未初始化")
+	case Disconnected:
+		return fmt.Errorf("BLE设备未连接")
+	case Connected:
+		// 继续执行发送操作，程序会继续执行 switch 语句块外的代码
+	default:
+		return fmt.Errorf("无效的BLE设备状态: %v", a.state)
+	}
 
-	info, er = a.AtCommandSend(ATNAME, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATNAME, info, er)
+	// 拼接AT命令，显式转换BleCommand为string并添加结尾
+	command := string(GATTSNTFY) + meg + "\r\n"
+	_, info, err := AtSendMesg(command, a.at_uart)
+	a.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> BleSend(): %v 的结果是:%v , 错误:%v ", GATTSNTFY, info, err)
 
-	info, er = a.AtCommandSend(ATADDR, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATADDR, info, er)
+	if err != nil {
+		a.lc.Errorf("!!!!!!!!!!!!!!!!!!!!! BleSend(): %v 出现错误: %v , 输出为: %v", GATTSNTFY, err, info)
+		return fmt.Errorf("发送mesg失败: %w", err)
+	}
 
-	info, er = a.AtCommandSend(ATADVSTART, a.at_uart, lc)
-	lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATADVSTART, info, er)
-
-	return info, er
+	return nil
 }
 
 // 获取ble模块当前状态
-func (a *AtCommand) AtState(u *Uart, lc logger.LoggingClient) (BleStatus, error) {
-	var info string
-	var er error
-	info, er = a.AtCommandSend(ATSTATE, u, lc)
-
+func CheckAtState(u *Uart) (BleStatus, error) {
+	_, rxbuf, er := AtCommandSend(ATSTATE, u) //向Ble模块发送检查指令
 	for _, status := range []BleStatus{Uninitialized, Initialized, Advertising, Connected, Disconnected} {
-		if strings.Contains(info, string(status)) {
+		if strings.Contains(rxbuf, string(status)) {
 
 			return status, nil
 		}
@@ -102,36 +146,48 @@ func (a *AtCommand) AtState(u *Uart, lc logger.LoggingClient) (BleStatus, error)
 
 }
 
-// 向设备发送AT指令并返回回显值
-func (a *AtCommand) AtCommandSend(code string, u *Uart, lc logger.LoggingClient) (string, error) {
+// 向设备发送AT指令
+// 返回：发送At指令长度、回显值、错误信息
+func AtCommandSend(command BleCommand, u *Uart) (txlen int, rxbuf string, er error) {
 	var err error
 
 	// 写入状态查询AT指令 (使用切片发送)
-	txlen, err := u.UartWrite([]byte(code), lc)
+	_txlen, err := u.UartWrite([]byte(command))
 	if err != nil {
-		lc.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
-		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
+		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
 	}
-	lc.Debugf("AtCommandSend(): AT指令 %v 已写入串口 length = %v", code, txlen)
-
-	//TODO 可能在这里需要加上 300毫秒延时，视情况而定
-	//
-	//
-	//
-	// time.Sleep(300 * time.Millisecond)
-
-	// 读取Ble模块回显值
-	if err := u.UartRead(128, lc); err != nil {
-		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
+	if err := u.UartRead(128); err != nil {
+		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
 	}
 	// 读值无错误
 	_str := string(u.rxbuf)
-	lc.Debugf("AtCommandSend(): 读取的回显值为： %v", _str)
 	if !strings.Contains(_str, "OK") { // 蓝牙回显不OK
-		return fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): 蓝牙回显错误: %v", _str)
+		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): 蓝牙回显错误: %v", _str)
 	}
 	// 清空 rxbuf 以准备下一次读取（可选）
 	u.rxbuf = nil
+	return _txlen, _str, err
+}
 
-	return _str, err
+// 向设备发送消息
+// 返回：消息发送长度、回显值、错误信息
+func AtSendMesg(mesg string, u *Uart) (txlen int, rxbuf string, er error) {
+	var err error
+
+	// 写入状态查询AT指令 (使用切片发送)
+	_txlen, err := u.UartWrite([]byte(mesg))
+	if err != nil {
+		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtSendMesg(): Message写入串口失败 %v", err)
+	}
+	if err := u.UartRead(128); err != nil {
+		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtSendMesg(): 串口读值有错误 %v", err)
+	}
+	// 读值无错误
+	_str := string(u.rxbuf)
+	if !strings.Contains(_str, "OK") { // 蓝牙回显不OK
+		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtSendMesg(): Message蓝牙回显错误: %v", _str)
+	}
+	// 清空 rxbuf 以准备下一次读取（可选）
+	u.rxbuf = nil
+	return _txlen, _str, err
 }

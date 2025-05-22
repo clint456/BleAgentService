@@ -15,11 +15,13 @@ import (
 )
 
 type BleDriver struct {
-	sdk      interfaces.DeviceServiceSDK
-	lc       logger.LoggingClient
-	asyncCh  chan<- *dsModels.AsyncValues
-	deviceCh chan<- []dsModels.DiscoveredDevice
-	uart     map[string]*Uart
+	sdk        interfaces.DeviceServiceSDK
+	lc         logger.LoggingClient
+	asyncCh    chan<- *dsModels.AsyncValues
+	deviceCh   chan<- []dsModels.DiscoveredDevice
+	uart       map[string]*Uart
+	initSwitch bool
+	sendMesg   string
 }
 
 func (s *BleDriver) Initialize(sdk interfaces.DeviceServiceSDK) error {
@@ -151,60 +153,44 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 		// Get the value type from device profile
 		valueType := req.Type
 		s.lc.Debugf("BleBleDriver.HandleWriteCommands(): value type = %v", valueType)
-		var value interface{}
-		var err error
+
+		// TODO：利用工厂函数将其封装起来
+		key_timeout_value, err := cast.ToIntE(req.Attributes["timeout"])
+		if err != nil {
+			return err
+		}
+		// 创建串口对象
+		if _, ok := s.uart[deviceLocation]; !ok {
+			s.uart[deviceLocation], err = NewUart(deviceLocation, baudRate, key_timeout_value)
+			if err != nil {
+				s.lc.Errorf("BleDriver.HandleWriteCommands(): 串口设备对象 创建失败：%v", err)
+				return err
+			}
+		}
+		at := NewAtCommand(s.uart[deviceLocation], s.lc) // 创建AT指令控制对象
 
 		key_type_value := fmt.Sprintf("%v", req.Attributes["type"])
 		if key_type_value == "ble" {
-			// bool: 控制蓝牙开启关闭
-			// string: 控制蓝牙发送/接收
-			switch valueType {
-			case common.ValueTypeBool:
-				value, err = params[i].BoolValue()
-			case common.ValueTypeString:
-				value, err = params[i].StringValue()
-			default:
-				return fmt.Errorf("BleBleDriver.HandleWriteCommands(): Unsupported value type: %v", valueType)
-			}
-			if err != nil {
-				return err
-			}
-			s.lc.Debugf("BleDriver.HandleWriteCommands(): %s= %v", valueType, value)
-
-			key_timeout_value, err := cast.ToIntE(req.Attributes["timeout"])
-			if err != nil {
-				return err
-			}
-			//判断串口设备对象是否创建
-			if _, ok := s.uart[deviceLocation]; !ok {
-				s.uart[deviceLocation], err = NewUart(deviceLocation, baudRate, key_timeout_value, s.lc)
-				if err != nil {
-					s.lc.Errorf("BleDriver.HandleWriteCommands(): 串口设备对象 创建失败：%v", err)
+			switch req.DeviceResourceName {
+			case "ble_init":
+				if s.initSwitch, err = params[i].BoolValue(); err != nil || s.initSwitch {
+					if nil != at.BleInit_2() { //初始化模式2，开启广播
+						s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE初始化模式2 失败：%v", err)
+						return err
+					}
+					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE初始化模块2 成功")
+				}
+			case "ble_send":
+				if s.sendMesg, err = params[i].StringValue(); err != nil {
+					if nil != at.BleSend(s.sendMesg) { //控制BLE发出数据
+						s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出数据 失败：%v", err)
+						return err
+					}
+					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出数据 成功")
 				}
 			}
-			at := AtCommand{
-				at_uart: s.uart[deviceLocation],
-			}
-
-			// 通过AT指令读取远程设备状态
-			at.state, e := at.AtState(s.uart[deviceLocation], s.lc)
-
-			if AtCommand.state == Uninitialized {
-				//TODO 判断设备初始化状态
-
-			}
-
-			// 判断是上面设备操作类型
-			// switch req.DeviceResourceName {
-			// case "ble_init":
-
-			// case "ble_send":
-
-			// case "ble_receive":
-			// default:
-			// 	s.lc.Errorf("BleDriver.HandleWriteCommands(): %s= %v", valueType, value)
-			// }
 		}
+
 	}
 	return nil
 }

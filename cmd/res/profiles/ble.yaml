@@ -29,4 +29,4 @@ deviceResources:
     attributes: { type: "ble", maxbytes: 160, timeout: 1}
     properties:
         valueType: "String"
-        readWrite: "RW"
+        readWrite: "R"
