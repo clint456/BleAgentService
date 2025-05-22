@@ -182,40 +182,17 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): 串口设备对象 创建失败：%v", err)
 				}
 			}
+			at := AtCommand{
+				at_uart: s.uart[deviceLocation],
+			}
 
-			//TODO 判断设备初始化状态
-			at := AtCommand{}
-			var info string
-			var er error
-			info, er = at.AtCommandSend(ATRESET, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATRESET,info, er)
+			// 通过AT指令读取远程设备状态
+			at.state, e := at.AtState(s.uart[deviceLocation], s.lc)
 
-			info, er = at.AtCommandSend(ATVERSION, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATVERSION,info, er)
+			if AtCommand.state == Uninitialized {
+				//TODO 判断设备初始化状态
 
-			info, er = at.AtCommandSend(ATINIT_2, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATINIT_2,info, er)
-
-			info, er = at.AtCommandSend(ATADV, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATADV,info, er)
-
-			info, er = at.AtCommandSend(ATGATTSSRV, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATGATTSSRV,info, er)
-
-			info, er = at.AtCommandSend(ATGATTSCHAR, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATGATTSCHAR,info, er)
-
-			info, er = at.AtCommandSend(ATGATTSSRVDONE, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATGATTSSRVDONE,info, er)
-
-			info, er = at.AtCommandSend(ATNAME, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATNAME,info, er)
-
-			info, er = at.AtCommandSend(ATADDR, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATADDR,info, er)
-
-			info, er = at.AtCommandSend(ATADVSTART, s.uart[deviceLocation], s.lc) 
-			s.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v  的结果是:%v , error:%v ", ATADVSTART,info, er)
+			}
 
 			// 判断是上面设备操作类型
 			// switch req.DeviceResourceName {
