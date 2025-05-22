@@ -41,7 +41,7 @@ const (
 	ATSTATE BleCommand = "AT+QBLESTAT\r\n" // 查询设备状态
 
 	// send
-	GATTSNTFY BleCommand = "AT+QBLEGATTSNTFY=0,fff2"
+	GATTSNTFY BleCommand = "AT+QBLEGATTSNTFY=0,fff2,"
 )
 
 type AtCommand struct {
@@ -54,7 +54,7 @@ type AtCommand struct {
 // 构造AtCommand的工厂函数
 func NewAtCommand(at_uart *Uart, lc logger.LoggingClient) *AtCommand {
 	state, _ := CheckAtState(at_uart) //检查当前Ble状态
-	lc.Debug("当前BLE设备状态为:%v", state)
+	lc.Debug("当前BLE设备状态为: %v", state)
 	return &AtCommand{
 		state:   state,
 		at_uart: at_uart,
@@ -138,7 +138,6 @@ func CheckAtState(u *Uart) (BleStatus, error) {
 	_, rxbuf, er := AtCommandSend(ATSTATE, u) //向Ble模块发送检查指令
 	for _, status := range []BleStatus{Uninitialized, Initialized, Advertising, Connected, Disconnected} {
 		if strings.Contains(rxbuf, string(status)) {
-
 			return status, nil
 		}
 	}

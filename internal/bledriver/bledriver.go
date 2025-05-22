@@ -77,7 +77,7 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
 			} else {
 				// initialize device for the first time
-				s.uart[deviceLocation], _ = NewUart(deviceLocation, baudRate, key_timeout_value, s.lc)
+				s.uart[deviceLocation], _ = NewUart(deviceLocation, baudRate, key_timeout_value)
 				s.uart[deviceLocation].rxbuf = nil
 
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
@@ -172,27 +172,37 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 		if key_type_value == "ble" {
 			switch req.DeviceResourceName {
 			case "ble_init":
-				if s.initSwitch, err = params[i].BoolValue(); err != nil || s.initSwitch {
+				if s.initSwitch, err = params[i].BoolValue(); err != nil {
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取开关失败%v", err)
+				}
+				if s.initSwitch {
 					if nil != at.BleInit_2() { //初始化模式2，开启广播
 						s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE初始化模式2 失败：%v", err)
 						return err
 					}
 					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE初始化模块2 成功")
+				} else {
+					// TODO关闭蓝牙模块
+					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE关闭")
 				}
+
 			case "ble_send":
 				if s.sendMesg, err = params[i].StringValue(); err != nil {
-					if nil != at.BleSend(s.sendMesg) { //控制BLE发出数据
-						s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出数据 失败：%v", err)
-						return err
-					}
-					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出数据 成功")
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的消息格式非法 ：%v", err)
 				}
+				if nil != at.BleSend(s.sendMesg) { //控制BLE发出数据
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出数据 失败：%v", err)
+					return err
+				}
+				s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出数据 成功")
+
 			}
 		}
 
 	}
 	return nil
 }
+
 
 // Discover triggers protocol specific device discovery, asynchronously writes
 // the results to the channel which is passed to the implementation via
