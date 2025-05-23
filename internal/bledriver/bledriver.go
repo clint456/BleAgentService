@@ -1,10 +1,8 @@
 package bledriver
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/edgexfoundry/device-sdk-go/v3/pkg/interfaces"
 	dsModels "github.com/edgexfoundry/device-sdk-go/v3/pkg/models"
@@ -75,7 +73,8 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 			// check device is already initialized
 			if _, ok := s.uart[deviceLocation]; ok {
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
-			} else {
+				s.uart[deviceLocation].rxbuf = nil //清空当前接收缓存区，只接收实时蓝牙发送的数据
+				} else {
 				// initialize device for the first time
 				s.uart[deviceLocation], _ = NewUart(deviceLocation, baudRate, key_timeout_value)
 				s.uart[deviceLocation].rxbuf = nil
@@ -86,32 +85,14 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 			if err := s.uart[deviceLocation].UartRead(key_maxbytes_value); err != nil {
 				return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
 			}
-
-			rxbuf := hex.EncodeToString(s.uart[deviceLocation].rxbuf)
+			// 目前串口只通过字符串发送
+			rxbuf := string(s.uart[deviceLocation].rxbuf)
 			s.lc.Debugf("Driver.HandleReadCommands(): Received Data = %s", rxbuf)
 
 			// Pass the received values to higher layers
 			// Handle data based on the value type mentioned in device profile
 			var cv *dsModels.CommandValue
 			switch valueType {
-			case common.ValueTypeInt8:
-				value, err := strconv.ParseInt(rxbuf, 16, 8)
-				if err != nil {
-					return nil, fmt.Errorf(castError, req.DeviceResourceName, err)
-				}
-				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, int8(value))
-				if err != nil {
-					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
-				}
-			case common.ValueTypeInt16:
-				value, err := strconv.ParseInt(rxbuf, 16, 16)
-				if err != nil {
-					return nil, fmt.Errorf(castError, req.DeviceResourceName, err)
-				}
-				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, int16(value))
-				if err != nil {
-					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
-				}
 			case common.ValueTypeString:
 				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
 				if err != nil {
@@ -129,7 +110,6 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 
 	return res, nil
 }
-
 // HandleWriteCommands 传递一个 CommandRequest 结构片段，每个片段代表特定设备资源的资源操作。
 // 由于这些命令都是执行命令，因此 params 为每个命令提供命令参数。
 func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest,
