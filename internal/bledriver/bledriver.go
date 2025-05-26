@@ -42,7 +42,6 @@ func (s *BleDriver) Start() error {
 // HandleReadCommands 被指定设备的协议读取操作触发。
 func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
 
-	const castError = "Failed to parse %s reading: %v"
 	const createCommandValueError = "Failed to create %s reading: %v"
 
 	res = make([]*dsModels.CommandValue, len(reqs))
@@ -104,6 +103,7 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 				if err != nil {
 					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
 				}
+			case comm.ValueType
 			default:
 				return nil, fmt.Errorf("Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
 			}
