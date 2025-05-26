@@ -72,15 +72,15 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 			// check device is already initialized
 			if _, ok := s.uart[deviceLocation]; ok {
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
-				s.uart[deviceLocation].rxbuf = nil //清空当前接收缓存区，只接收实时蓝牙发送的数据
+
 			} else {
 				// initialize device for the first time
 				s.uart[deviceLocation], _ = NewUart(deviceLocation, baudRate, key_timeout_value)
-				s.uart[deviceLocation].rxbuf = nil
 
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
 			}
-
+			// 清空当前接收缓存区
+			s.uart[deviceLocation].rxbuf = nil 
 			if err := s.uart[deviceLocation].UartRead(key_maxbytes_value); err != nil {
 				return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
 			}
