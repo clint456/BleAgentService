@@ -52,7 +52,6 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 	for i, protocol := range protocols {
 		deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
 		baudRate, _ = cast.ToIntE(protocol["baudRate"])
-
 		s.lc.Debugf("Driver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v", i, deviceLocation, baudRate)
 	}
 
@@ -140,12 +139,11 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 		valueType := req.Type
 		s.lc.Debugf("BleBleDriver.HandleWriteCommands(): value type = %v", valueType)
 
-		// TODO：利用工厂函数将其封装起来
+	
 		key_timeout_value, err := cast.ToIntE(req.Attributes["timeout"])
 		if err != nil {
 			return err
 		}
-		// 创建串口对象
 		if _, ok := s.uart[deviceLocation]; !ok {
 			s.uart[deviceLocation], err = NewUart(deviceLocation, baudRate, key_timeout_value)
 			if err != nil {
