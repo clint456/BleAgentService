@@ -14,13 +14,15 @@ import (
 )
 
 type BleDriver struct {
-	sdk        interfaces.DeviceServiceSDK
-	lc         logger.LoggingClient
-	asyncCh    chan<- *dsModels.AsyncValues
-	deviceCh   chan<- []dsModels.DiscoveredDevice
-	uart       map[string]*Uart
-	initSwitch bool
-	sendMesg   string
+	sdk            interfaces.DeviceServiceSDK
+	lc             logger.LoggingClient
+	asyncCh        chan<- *dsModels.AsyncValues
+	deviceCh       chan<- []dsModels.DiscoveredDevice
+	uart           map[string]*Uart
+	initSwitch     bool
+	sendMesg       string
+	deviceLocation string
+	baudRate       int
 }
 
 func (s *BleDriver) Initialize(sdk interfaces.DeviceServiceSDK) error {
@@ -42,81 +44,98 @@ func (s *BleDriver) Start() error {
 
 // HandleReadCommands 被指定设备的协议读取操作触发。
 func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
-
-	const createCommandValueError = "Failed to create %s reading: %v"
-
-	res = make([]*dsModels.CommandValue, len(reqs))
-
-	var deviceLocation string
-	var baudRate int
-
+	var responses = make([]*dsModels.CommandValue, len(reqs)) //创建命令切片
 	for i, protocol := range protocols {
-		deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
-		baudRate, _ = cast.ToIntE(protocol["baudRate"])
-		s.lc.Debugf("Driver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v", i, deviceLocation, baudRate)
+		s.deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
+		s.baudRate, _ = cast.ToIntE(protocol["baudRate"])
+		s.lc.Debugf("Driver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v", i, s.deviceLocation, s.baudRate)
 	}
 
 	for i, req := range reqs {
 		s.lc.Debugf("Driver.HandleReadCommands(): protocols: %v resource: %v attributes: %v", protocols, req.DeviceResourceName, req.Attributes)
-
-		// Get the value type from device profile
-		valueType := req.Type
-		s.lc.Debugf("Driver.HandleReadCommands(): value type = %v", valueType)
-
-		key_type_value := fmt.Sprintf("%v", req.Attributes["type"])
-
-		if key_type_value == "ble" {
-			key_maxbytes_value, _ := cast.ToIntE(req.Attributes["maxbytes"])
-			key_timeout_value, _ := cast.ToIntE(req.Attributes["timeout"])
-
-			// check device is already initialized
-			if _, ok := s.uart[deviceLocation]; ok {
-				s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
-
-			} else {
-				// initialize device for the first time
-				s.uart[deviceLocation], _ = NewUart(deviceLocation, baudRate, key_timeout_value)
-
-				s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
-			}
-			// 清空当前接收缓存区
-			s.uart[deviceLocation].rxbuf = nil
-			if err := s.uart[deviceLocation].UartRead(key_maxbytes_value); err != nil {
-				return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
-			}
-			// 目前串口只通过字符串发送
-			rxbuf := string(s.uart[deviceLocation].rxbuf)
-			s.lc.Debugf("Driver.HandleReadCommands(): Received Data = %s", rxbuf)
-
-			// Pass the received values to higher layers
-			// Handle data based on the value type mentioned in device profile
-			var cv *dsModels.CommandValue
-
-			switch valueType {
-			case common.ValueTypeString:
-				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
-				if err != nil {
-					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
-				}
-			case common.ValueTypeBool: //获取当前蓝牙设备状态
-				sta, _ := CheckAtState(s.uart[deviceLocation])
-				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
-				if err != nil {
-					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
-				}
-			case common.ValueTypeObject:
-
-			default:
-				return nil, fmt.Errorf("Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
-			}
-
-			s.uart[deviceLocation].rxbuf = nil
-			res[i] = cv
-			s.lc.Debugf("Driver.HandleReadCommands(): Response = %v", res[i])
+		resource, ok := s.sdk.DeviceResource(deviceName, req.DeviceResourceName)
+		if !ok {
+			return responses, fmt.Errorf("handle read commands failed: Device Resource %s not found", req.DeviceResourceName)
 		}
+
+		res, err := s.handleReadCommandRequest(req, resource)
+		if err != nil {
+			s.lc.Errorf("Handle read commands failed: %v", err)
+			return responses, err
+		}
+
+		responses[i] = res
 	}
 
-	return res, nil
+	return responses, err
+
+}
+
+func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resource models.DeviceResource) (*dsModels.CommandValue, error) {
+	var result *dsModels.CommandValue
+	var err error
+	const createCommandValueError = "Failed to create %s reading: %v"
+
+	// Get the value type from device profile
+	valueType := req.Type
+	s.lc.Debugf("Driver.HandleReadCommands(): value type = %v", valueType)
+
+	key_type_value := fmt.Sprintf("%v", req.Attributes["type"])
+
+	if key_type_value == "ble" {
+		key_maxbytes_value, _ := cast.ToIntE(req.Attributes["maxbytes"])
+		key_timeout_value, _ := cast.ToIntE(req.Attributes["timeout"])
+
+		// check device is already initialized
+		if _, ok := s.uart[s.deviceLocation]; ok {
+			s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
+
+		} else {
+			// initialize device for the first time
+			s.uart[s.deviceLocation], _ = NewUart(s.deviceLocation, s.baudRate, key_timeout_value)
+
+			s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
+		}
+		// 清空当前接收缓存区
+		s.uart[s.deviceLocation].rxbuf = nil
+		if err := s.uart[s.deviceLocation].UartRead(key_maxbytes_value); err != nil {
+			return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
+		}
+		// 目前串口只通过字符串发送
+		rxbuf := string(s.uart[s.deviceLocation].rxbuf)
+		s.lc.Debugf("Driver.HandleReadCommands(): Received Data = %s", rxbuf)
+
+		// Pass the received values to higher layers
+		// Handle data based on the value type mentioned in device profile
+		var cv *dsModels.CommandValue
+
+		switch valueType {
+		case common.ValueTypeString:
+			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
+			if err != nil {
+				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+			}
+		case common.ValueTypeBool: //获取当前蓝牙设备状态
+			sta, _ := CheckAtState(s.uart[s.deviceLocation])
+			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
+			if err != nil {
+				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+			}
+		case common.ValueTypeObject:
+			//TODO对JSON对象进行数据解析
+			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
+			if err != nil {
+				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+			}
+		default:
+			return nil, fmt.Errorf("Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
+		}
+
+		s.uart[s.deviceLocation].rxbuf = nil
+		result = cv
+		s.lc.Debugf("Driver.HandleReadCommands(): Response = %v", result)
+	}
+	return result, nil
 }
 
 // HandleWriteCommands 传递一个 CommandRequest 结构片段，每个片段代表特定设备资源的资源操作。
