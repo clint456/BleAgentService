@@ -15,7 +15,7 @@ deviceResources:
         valueType: "Bool"
         readWrite: "RW"
 -
-    name: "ble_send"
+    name: "ble_data"
     isHidden: false
     description: "Ble Moudle Send Data(String)"
     attributes: { type: "ble", maxbytes: 160, timeout: 1}
@@ -23,10 +23,3 @@ deviceResources:
         valueType: "String"
         readWrite: "RW"
 -
-    name: "ble_receive"
-    isHidden: false
-    description: "Ble Moudle receive Data(String)"
-    attributes: { type: "ble", maxbytes: 160, timeout: 1}
-    properties:
-        valueType: "String"
-        readWrite: "R"

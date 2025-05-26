@@ -102,6 +102,8 @@ func (a *AtCommand) BleInit_2() error {
 	return lastErr
 }
 
+
+// 向Ble设备发送消息数据（string）
 func (a *AtCommand) BleSend(meg string) error {
 	// 检查内容是否为空
 	if meg == "" {
@@ -120,7 +122,7 @@ func (a *AtCommand) BleSend(meg string) error {
 		return fmt.Errorf("无效的BLE设备状态: %v", a.state)
 	}
 
-	// 拼接AT命令，显式转换BleCommand为string并添加结尾
+	// 拼接AT命令+消息，显式转换BleCommand为string并添加结尾
 	command := string(GATTSNTFY) + meg + "\r\n"
 	_, info, err := AtSendMesg(command, a.at_uart)
 	a.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> BleSend(): %v 的结果是:%v , 错误:%v ", GATTSNTFY, info, err)

@@ -1,8 +1,7 @@
 Writable:
   LogLevel: DEBUG
-
 Service:
-  Host: localhost
+  Host: 192.168.8.216
   Port: 59995
   StartupMsg: device uart started
 

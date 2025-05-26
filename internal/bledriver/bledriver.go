@@ -38,7 +38,6 @@ func (s *BleDriver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 func (s *BleDriver) Start() error {
 	return nil
 }
-
 // HandleReadCommands 被指定设备的协议读取操作触发。
 func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
 
@@ -74,7 +73,7 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 			if _, ok := s.uart[deviceLocation]; ok {
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
 				s.uart[deviceLocation].rxbuf = nil //清空当前接收缓存区，只接收实时蓝牙发送的数据
-				} else {
+			} else {
 				// initialize device for the first time
 				s.uart[deviceLocation], _ = NewUart(deviceLocation, baudRate, key_timeout_value)
 				s.uart[deviceLocation].rxbuf = nil
@@ -92,9 +91,16 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 			// Pass the received values to higher layers
 			// Handle data based on the value type mentioned in device profile
 			var cv *dsModels.CommandValue
+
 			switch valueType {
 			case common.ValueTypeString:
 				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
+				if err != nil {
+					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+				}
+			case common.ValueTypeBool: //获取当前蓝牙设备状态
+				sta, _ := CheckAtState(s.uart[deviceLocation])
+				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
 				if err != nil {
 					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
 				}
@@ -110,6 +116,7 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 
 	return res, nil
 }
+
 // HandleWriteCommands 传递一个 CommandRequest 结构片段，每个片段代表特定设备资源的资源操作。
 // 由于这些命令都是执行命令，因此 params 为每个命令提供命令参数。
 func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest,
@@ -166,7 +173,7 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE关闭")
 				}
 
-			case "ble_send":
+			case "ble_data":
 				if s.sendMesg, err = params[i].StringValue(); err != nil {
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的消息格式非法 ：%v", err)
 				}
