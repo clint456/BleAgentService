@@ -38,6 +38,7 @@ func (s *BleDriver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 func (s *BleDriver) Start() error {
 	return nil
 }
+
 // HandleReadCommands 被指定设备的协议读取操作触发。
 func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
 
@@ -79,7 +80,7 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 				s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
 			}
 			// 清空当前接收缓存区
-			s.uart[deviceLocation].rxbuf = nil 
+			s.uart[deviceLocation].rxbuf = nil
 			if err := s.uart[deviceLocation].UartRead(key_maxbytes_value); err != nil {
 				return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
 			}
@@ -139,7 +140,6 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 		valueType := req.Type
 		s.lc.Debugf("BleBleDriver.HandleWriteCommands(): value type = %v", valueType)
 
-	
 		key_timeout_value, err := cast.ToIntE(req.Attributes["timeout"])
 		if err != nil {
 			return err
@@ -187,7 +187,6 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 	}
 	return nil
 }
-
 
 // Discover triggers protocol specific device discovery, asynchronously writes
 // the results to the channel which is passed to the implementation via

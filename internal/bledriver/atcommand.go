@@ -47,7 +47,6 @@ const (
 type AtCommand struct {
 	state   BleStatus
 	at_uart *Uart
-	command BleCommand
 	lc      logger.LoggingClient
 }
 
@@ -101,7 +100,6 @@ func (a *AtCommand) BleInit_2() error {
 	}
 	return lastErr
 }
-
 
 // 向Ble设备发送消息数据（string）
 func (a *AtCommand) BleSend(meg string) error {
