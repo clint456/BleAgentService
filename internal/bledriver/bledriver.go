@@ -1,6 +1,7 @@
 package bledriver
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -88,22 +89,19 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 
 		// check device is already initialized
 		if _, ok := s.uart[s.deviceLocation]; ok {
-			s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
+			s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[s.deviceLocation], s.baudRate, key_maxbytes_value, key_timeout_value)
 
 		} else {
 			// initialize device for the first time
 			s.uart[s.deviceLocation], _ = NewUart(s.deviceLocation, s.baudRate, key_timeout_value)
-			s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
+			s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[s.deviceLocation], s.baudRate, key_maxbytes_value, key_timeout_value)
 		}
 		// 清空当前接收缓存区
 		s.uart[s.deviceLocation].rxbuf = nil
-		//
+		// 读取缓存区
 		if err := s.uart[s.deviceLocation].UartRead(key_maxbytes_value); err != nil {
 			return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
 		}
-		// 目前串口只通过字符串发送
-		rxbuf := string(s.uart[s.deviceLocation].rxbuf)
-		s.lc.Debugf("Driver.HandleReadCommands(): Received Data = %s", rxbuf)
 
 		// Pass the received values to higher layers
 		// Handle data based on the value type mentioned in device profile
@@ -111,19 +109,28 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 
 		switch valueType {
 		case common.ValueTypeString:
+			// 字符串接收
+			rxbuf := string(s.uart[s.deviceLocation].rxbuf)
 			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
 			if err != nil {
 				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
 			}
-		case common.ValueTypeBool: //获取当前蓝牙设备状态
+		case common.ValueTypeBool:
+			//获取当前蓝牙设备状态
 			sta, _ := CheckAtState(s.uart[s.deviceLocation])
 			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
 			if err != nil {
 				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
 			}
 		case common.ValueTypeObject:
-			//TODO对JSON对象进行数据解析
-			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
+			//JSON数据解析
+			var response map[string]interface{}
+			err = json.Unmarshal(s.uart[s.deviceLocation].rxbuf, &response)
+			if err != nil {
+				s.lc.Errorf("Error unmarshaling response: %s", err)
+				return nil, fmt.Errorf("Error unmarshaling response: %s", err)
+			}
+			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, response)
 			if err != nil {
 				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
 			}

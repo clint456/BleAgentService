@@ -8,12 +8,7 @@ package bledriver
 
 import (
 	"fmt"
-	"net/url"
 
-	"github.com/edgexfoundry/go-mod-bootstrap/v3/bootstrap/interfaces"
-	"github.com/edgexfoundry/go-mod-bootstrap/v3/bootstrap/secret"
-	"github.com/edgexfoundry/go-mod-bootstrap/v3/bootstrap/startup"
-	"github.com/edgexfoundry/go-mod-bootstrap/v3/config"
 	"github.com/edgexfoundry/go-mod-core-contracts/v3/errors"
 	"github.com/edgexfoundry/go-mod-core-contracts/v3/models"
 )
@@ -85,55 +80,4 @@ func fetchCommandTopic(protocols map[string]models.ProtocolProperties) (string, 
 	}
 
 	return commandTopicString, nil
-}
-
-func SetCredentials(uri *url.URL, secretProvider interfaces.SecretProvider, category string, authMode string, secretName string) error {
-	switch authMode {
-	case AuthModeUsernamePassword:
-		credentials, err := GetCredentials(secretProvider, secretName)
-		if err != nil {
-			return fmt.Errorf("Unable to get %s MQTT credentials for secret name '%s': %s", category, secretName, err.Error())
-		}
-
-		driver.Logger.Infof("%s MQTT credentials loaded", category)
-		uri.User = url.UserPassword(credentials.Username, credentials.Password)
-
-	case AuthModeNone:
-		return nil
-	default:
-		return fmt.Errorf("invalid AuthMode '%s' for %s MQTT connection of", authMode, category)
-	}
-
-	return nil
-}
-
-func GetCredentials(secretProvider interfaces.SecretProvider, secretName string) (config.Credentials, error) {
-	credentials := config.Credentials{}
-
-	timer := startup.NewTimer(driver.serviceConfig.MQTTBrokerInfo.CredentialsRetryTime, driver.serviceConfig.MQTTBrokerInfo.CredentialsRetryWait)
-
-	var secretData map[string]string
-	var err error
-	for timer.HasNotElapsed() {
-		secretData, err = secretProvider.GetSecret(secretName, secret.UsernameKey, secret.PasswordKey)
-		if err == nil {
-			break
-		}
-
-		driver.Logger.Warnf(
-			"Unable to retrieve MQTT credentials from SecretProvider at secret name '%s': %s. Retrying for %s",
-			secretName,
-			err.Error(),
-			timer.RemainingAsString())
-		timer.SleepForInterval()
-	}
-
-	if err != nil {
-		return credentials, err
-	}
-
-	credentials.Username = secretData[secret.UsernameKey]
-	credentials.Password = secretData[secret.PasswordKey]
-
-	return credentials, nil
 }
