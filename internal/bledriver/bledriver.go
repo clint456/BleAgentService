@@ -93,11 +93,11 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 		} else {
 			// initialize device for the first time
 			s.uart[s.deviceLocation], _ = NewUart(s.deviceLocation, s.baudRate, key_timeout_value)
-
 			s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[deviceLocation], baudRate, key_maxbytes_value, key_timeout_value)
 		}
 		// 清空当前接收缓存区
 		s.uart[s.deviceLocation].rxbuf = nil
+		//
 		if err := s.uart[s.deviceLocation].UartRead(key_maxbytes_value); err != nil {
 			return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
 		}
