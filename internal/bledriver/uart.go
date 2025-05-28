@@ -1,10 +1,14 @@
 package bledriver
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"strings"
 	"time"
-	"encoding/json"
+
 	"github.com/tarm/serial"
 )
 
@@ -20,6 +24,16 @@ type Uart struct {
 	rxbuf      []byte
 	enable     bool
 	portStatus bool
+}
+
+type JsonMessage struct {
+	APIVersion    string      `json:"apiVersion"`    // API 版本
+	ReceivedTopic string      `json:"receivedTopic"` // 接收到的主题
+	CorrelationID string      `json:"correlationID"` // 消息跟踪 ID
+	RequestID     string      `json:"requestID"`     // 请求 ID
+	ErrorCode     int         `json:"errorCode"`     // 错误码，0 表示成功
+	Payload       interface{} `json:"payload"`       // 消息内容（动态类型）
+	ContentType   string      `json:"contentType"`   // MIME 类型
 }
 
 // 传入：设备名、波特率
@@ -132,8 +146,54 @@ func (dev *Uart) UartWrite(txbuf []byte) (int, error) {
 	return length, err
 }
 
+func (dev *Uart) UartReadJson() error {
 
-func UartReadJson(maxbytes int) error {
+	// 创建带缓冲的读取器
+	reader := bufio.NewReader(dev.conn)
 	// 用于累积分片
 	var buffer strings.Builder
+	fmt.Println("开始接收串口数据...")
+
+	for {
+		// 按行读取分片（假设分片以换行符分隔）
+		chunk, err := reader.ReadString('\n')
+		if err != nil {
+			log.Printf("读取串口数据失败: %v", err)
+			continue
+		}
+
+		// 去除换行符并累积到缓冲区
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" {
+			continue // 忽略空行
+		}
+		buffer.WriteString(chunk)
+
+		// 尝试解析累积的缓冲区数据
+		var msg JsonMessage
+		if err := json.Unmarshal([]byte(buffer.String()), &msg); err != nil {
+			// 解析失败，可能是数据不完整，继续累积
+			log.Printf("JSON 解析失败（可能数据不完整）: %v", err)
+			continue
+		}
+
+		// 解析成功，检查 errorCode
+		if msg.ErrorCode != 0 {
+			log.Printf("接收到错误消息: CorrelationID=%s, RequestID=%s, ErrorCode=%d",
+				msg.CorrelationID, msg.RequestID, msg.ErrorCode)
+		} else {
+			// 打印解析后的数据
+			fmt.Printf("接收到完整 JSON 数据:\n")
+			fmt.Printf("  API Version: %s\n", msg.APIVersion)
+			fmt.Printf("  Received Topic: %s\n", msg.ReceivedTopic)
+			fmt.Printf("  CorrelationID: %s\n", msg.CorrelationID)
+			fmt.Printf("  RequestID: %s\n", msg.RequestID)
+			fmt.Printf("  ErrorCode: %d\n", msg.ErrorCode)
+			fmt.Printf("  ContentType: %s\n", msg.ContentType)
+			fmt.Printf("  Payload: %v\n", msg.Payload)
+		}
+
+		// 清空缓冲区，准备接收下一个 JSON
+		buffer.Reset()
+	}
 }
