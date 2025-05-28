@@ -4,7 +4,7 @@ import (
 	"io"
 	"log"
 	"time"
-
+	"encoding/json"
 	"github.com/tarm/serial"
 )
 
@@ -45,9 +45,9 @@ func NewUart(dev string, baud int, timeout int) (*Uart, error) {
 // 传入：读取串口缓冲取到rxbuf中
 // 返回： error类或nil
 func (dev *Uart) UartRead(maxbytes int) error {
-	if !dev.enable {
-		return nil
-	}
+	// if !dev.enable {
+	// 	return nil
+	// }
 	var buf []byte
 	// serial包方法 一次读取的最大值为16byte
 	// 分包读取
@@ -130,4 +130,10 @@ func (dev *Uart) UartWrite(txbuf []byte) (int, error) {
 
 	// 返回写入的字节数和错误（此时 err 为 nil）
 	return length, err
+}
+
+
+func UartReadJson(maxbytes int) error {
+	// 用于累积分片
+	var buffer strings.Builder
 }
