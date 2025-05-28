@@ -48,17 +48,13 @@ func (dev *Uart) UartRead(maxbytes int) error {
 	if !dev.enable {
 		return nil
 	}
-
 	var buf []byte
-
 	// serial包方法 一次读取的最大值为16byte
 	// 分包读取
 	readCount := (maxbytes / 16) + 1
-
 	if dev.portStatus {
 		return nil
 	}
-
 	dev.portStatus = true //？
 
 	// 最多允许读取 128byte

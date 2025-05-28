@@ -58,16 +58,13 @@ func (s *BleDriver) HandleReadCommands(deviceName string, protocols map[string]m
 		if !ok {
 			return responses, fmt.Errorf("handle read commands failed: Device Resource %s not found", req.DeviceResourceName)
 		}
-
 		res, err := s.handleReadCommandRequest(req, resource)
 		if err != nil {
 			s.lc.Errorf("Handle read commands failed: %v", err)
 			return responses, err
 		}
-
 		responses[i] = res
 	}
-
 	return responses, err
 
 }
@@ -199,16 +196,18 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE关闭")
 				}
 
-			case "ble_data":
+			case "ble_str":
 				if s.sendMesg, err = params[i].StringValue(); err != nil {
-					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的消息格式非法 ：%v", err)
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的String消息格式非法 ：%v", err)
 				}
 				if nil != at.BleSend(s.sendMesg) { //控制BLE发出数据
-					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出数据 失败：%v", err)
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出String数据 失败：%v", err)
 					return err
 				}
-				s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出数据 成功")
+				s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出String数据 成功")
 
+			case "ble_json":
+				s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出Json数据 成功")
 			}
 		}
 

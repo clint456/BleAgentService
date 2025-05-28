@@ -18,7 +18,7 @@ deviceResources:
     name: "ble_str"
     isHidden: false
     description: "Ble Moudle Transports Data(String)"
-    attributes: { type: "ble", maxbytes: 160, timeout: 1}
+    attributes: { type: "ble", maxbytes: 160, timeout: 0.5}
     properties:
         valueType: "String"
         readWrite: "RW"
@@ -26,6 +26,7 @@ deviceResources:
     name: "ble_json"
     isHidden: false
     description: "Ble Moudle Transports Data(Json)"
+    attributes: { type: "ble", maxbytes: 160, timeout: 0.5}
     properties:
         valueType: "Object"
         readWrite: "RW"
