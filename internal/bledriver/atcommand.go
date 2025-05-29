@@ -120,63 +120,6 @@ func (a *AtCommand) BleSendString(meg string) error {
 
 	return nil
 }
-func (a *AtCommand) BleSendJson(meg string) error {
-	// 检查内容是否为空
-	if meg == "" {
-		return fmt.Errorf("发送内容不能为空")
-	}
-
-	// 验证设备状态
-	switch a.state {
-	case Uninitialized:
-		return fmt.Errorf("BLE设备未初始化")
-	case Disconnected:
-		return fmt.Errorf("BLE设备未连接")
-	case Connected:
-		// 继续执行发送操作
-	default:
-		return fmt.Errorf("无效的BLE设备状态: %v", a.state)
-	}
-
-	// AT命令前缀
-	prefix := "AT+QBLEGATTSNTFY=0,fff2,"
-	prefixLen := len(prefix)
-	// 每包最大长度23字节，减去前缀、引号(2字节)、\r\n(2字节)
-	maxPayload := 64 - prefixLen - 2
-	if maxPayload <= 0 {
-		return fmt.Errorf("前缀长度过长 (%d)，无法发送有效数据", prefixLen)
-	}
-
-	// 将消息分包
-	for i := 0; i < len(meg); i += maxPayload {
-		// 计算当前包的结束位置
-		end := i + maxPayload
-		if end > len(meg) {
-			end = len(meg)
-		}
-
-		// 确保切片索引有效
-		if i >= end || i < 0 || end > len(meg) {
-			return fmt.Errorf("无效的切片索引: i=%d, end=%d, len(meg)=%d", i, end, len(meg))
-		}
-
-		// 提取当前包的内容
-		chunk := meg[i:end]
-
-		// 拼接AT命令，添加引号包裹JSON片段
-		command := fmt.Sprintf("%s%s\r\n", prefix, chunk)
-		a.lc.Debugf("========================>>>>>>>>>>>>>>>>>>>> 第%v分包:发送的值为:%v", maxPayload, command)
-		_, info, err := AtSendMesg(command, a.at_uart)
-		a.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> BleSend(): %v的结果是:%v , 错误:%v ", prefix, info, err)
-
-		if err != nil {
-			a.lc.Errorf("!!!!!!!!!!!!!!!!!!!!! BleSend(): %v 出现错误: %v , 输出为: %v", prefix, err, info)
-			return fmt.Errorf("发送mesg失败: %w", err)
-		}
-	}
-
-	return nil
-}
 
 // 获取ble模块当前状态
 func CheckAtState(u *Uart) (BleStatus, error) {
