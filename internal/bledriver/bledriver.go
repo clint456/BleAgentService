@@ -118,7 +118,10 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 			case "ble_init":
 				//获取当前蓝牙设备状态
 				s.uart[s.deviceLocation].rxbuf = nil
-				sta, _ := CheckAtState(s.uart[s.deviceLocation])
+				sta, err := CheckAtState(s.uart[s.deviceLocation])
+				if err != nil {
+					return nil, fmt.Errorf("读取蓝牙状态出现错误: %v", err)
+				}
 				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
 				if err != nil {
 					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
@@ -203,7 +206,7 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 				if s.sendStr, err = params[i].StringValue(); err != nil {
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的String消息格式非法 ：%v", err)
 				}
-				if nil != at.BleSend(s.sendStr) { //控制BLE发出数据
+				if nil != at.BleSendString(s.sendStr) { //控制BLE发出数据
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出String数据 失败：%v", err)
 					return err
 				}
@@ -219,7 +222,7 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 					return err
 				}
 				sendMesg := string(sendbytes)
-				if nil != at.BleSend(sendMesg) { //控制BLE发出数据
+				if err = at.BleSendJson(sendMesg); err != nil { //控制BLE发出数据
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出String数据 失败：%v", err)
 					return err
 				}
