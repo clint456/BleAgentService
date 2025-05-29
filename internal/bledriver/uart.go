@@ -1,12 +1,8 @@
 package bledriver
 
 import (
-	"bufio"
-	"encoding/json"
-	"fmt"
 	"io"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/tarm/serial"
@@ -63,13 +59,12 @@ func (dev *Uart) UartRead(maxbytes int) error {
 	// 	return nil
 	// }
 	var buf []byte
-	// serial包方法 一次读取的最大值为16byte
 	// 分包读取
 	readCount := (maxbytes / 16) + 1
 	if dev.portStatus {
 		return nil
 	}
-	dev.portStatus = true //？
+	dev.portStatus = true
 
 	// 最多允许读取 128byte
 	b := make([]byte, 128)
@@ -86,8 +81,6 @@ func (dev *Uart) UartRead(maxbytes int) error {
 				// 跳出循环，结束读取
 				break
 			}
-			// 对于其他类型的错误，记录错误日志
-
 			// 将设备端口状态设置为不可用（false）
 			dev.portStatus = false
 
@@ -144,56 +137,4 @@ func (dev *Uart) UartWrite(txbuf []byte) (int, error) {
 
 	// 返回写入的字节数和错误（此时 err 为 nil）
 	return length, err
-}
-
-func (dev *Uart) UartReadJson() error {
-
-	// 创建带缓冲的读取器
-	reader := bufio.NewReader(dev.conn)
-	// 用于累积分片
-	var buffer strings.Builder
-	fmt.Println("开始接收串口数据...")
-
-	for {
-		// 按行读取分片（假设分片以换行符分隔）
-		chunk, err := reader.ReadString('\n')
-		if err != nil {
-			log.Printf("读取串口数据失败: %v", err)
-			continue
-		}
-
-		// 去除换行符并累积到缓冲区
-		chunk = strings.TrimSpace(chunk)
-		if chunk == "" {
-			continue // 忽略空行
-		}
-		buffer.WriteString(chunk)
-
-		// 尝试解析累积的缓冲区数据
-		var msg JsonMessage
-		if err := json.Unmarshal([]byte(buffer.String()), &msg); err != nil {
-			// 解析失败，可能是数据不完整，继续累积
-			log.Printf("JSON 解析失败（可能数据不完整）: %v", err)
-			continue
-		}
-
-		// 解析成功，检查 errorCode
-		if msg.ErrorCode != 0 {
-			log.Printf("接收到错误消息: CorrelationID=%s, RequestID=%s, ErrorCode=%d",
-				msg.CorrelationID, msg.RequestID, msg.ErrorCode)
-		} else {
-			// 打印解析后的数据
-			fmt.Printf("接收到完整 JSON 数据:\n")
-			fmt.Printf("  API Version: %s\n", msg.APIVersion)
-			fmt.Printf("  Received Topic: %s\n", msg.ReceivedTopic)
-			fmt.Printf("  CorrelationID: %s\n", msg.CorrelationID)
-			fmt.Printf("  RequestID: %s\n", msg.RequestID)
-			fmt.Printf("  ErrorCode: %d\n", msg.ErrorCode)
-			fmt.Printf("  ContentType: %s\n", msg.ContentType)
-			fmt.Printf("  Payload: %v\n", msg.Payload)
-		}
-
-		// 清空缓冲区，准备接收下一个 JSON
-		buffer.Reset()
-	}
 }

@@ -1,6 +1,7 @@
 package bledriver
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -20,7 +21,8 @@ type BleDriver struct {
 	deviceCh       chan<- []dsModels.DiscoveredDevice
 	uart           map[string]*Uart
 	initSwitch     bool
-	sendMesg       string
+	sendStr        string
+	sendJson       interface{}
 	deviceLocation string
 	baudRate       int
 }
@@ -97,48 +99,48 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 		// Handle data based on the value type mentioned in device profile
 		var cv *dsModels.CommandValue
 
-		switch valueType {
-		case common.ValueTypeString:
-			// 字符串接收
-			// 清空当前接收缓存区
+		key_type_value := fmt.Sprintf("%v", req.Attributes["type"])
+		if key_type_value == "ble" {
+			switch req.DeviceResourceName {
+			case "ble_str":
+				// 字符串接收
+				// 清空当前接收缓存区
+				s.uart[s.deviceLocation].rxbuf = nil
+				// 读取缓存区
+				if err := s.uart[s.deviceLocation].UartRead(key_maxbytes_value); err != nil {
+					return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
+				}
+				rxbuf := string(s.uart[s.deviceLocation].rxbuf)
+				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
+				if err != nil {
+					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+				}
+			case "ble_init":
+				//获取当前蓝牙设备状态
+				s.uart[s.deviceLocation].rxbuf = nil
+				sta, _ := CheckAtState(s.uart[s.deviceLocation])
+				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
+				if err != nil {
+					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+				}
+			case "ble_json":
+				//JSON数据读取
+				s.uart[s.deviceLocation].rxbuf = nil
+				_rx, _ := ExtractJSONFromSerial(s.uart[s.deviceLocation].conn)
+
+				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, _rx)
+				if err != nil {
+					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
+				}
+			default:
+				return nil, fmt.Errorf("Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
+			}
+
 			s.uart[s.deviceLocation].rxbuf = nil
-			// 读取缓存区
-			if err := s.uart[s.deviceLocation].UartRead(key_maxbytes_value); err != nil {
-				return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
-			}
-			rxbuf := string(s.uart[s.deviceLocation].rxbuf)
-			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
-			if err != nil {
-				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
-			}
-		case common.ValueTypeBool:
-			//获取当前蓝牙设备状态
-			sta, _ := CheckAtState(s.uart[s.deviceLocation])
-			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
-			if err != nil {
-				return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
-			}
-		case common.ValueTypeObject:
-			//JSON数据读取
-			s.uart[s.deviceLocation].UartReadJson()
-			//JSON数据解析
-			// var response map[string]interface{}
-			// err = json.Unmarshal(s.uart[s.deviceLocation].rxbuf, &response)
-			// if err != nil {
-			// 	s.lc.Errorf("Error unmarshaling response: %s", err)
-			// 	return nil, fmt.Errorf("Error unmarshaling response: %s", err)
-			// }
-			// cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, response)
-			// if err != nil {
-			// 	return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
-			// }
-		default:
-			return nil, fmt.Errorf("Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
+			result = cv
+			s.lc.Debugf("Driver.HandleReadCommands(): Response = %v", result)
 		}
 
-		s.uart[s.deviceLocation].rxbuf = nil
-		result = cv
-		s.lc.Debugf("Driver.HandleReadCommands(): Response = %v", result)
 	}
 	return result, nil
 }
@@ -198,17 +200,30 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 				}
 
 			case "ble_str":
-				if s.sendMesg, err = params[i].StringValue(); err != nil {
+				if s.sendStr, err = params[i].StringValue(); err != nil {
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的String消息格式非法 ：%v", err)
 				}
-				if nil != at.BleSend(s.sendMesg) { //控制BLE发出数据
+				if nil != at.BleSend(s.sendStr) { //控制BLE发出数据
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出String数据 失败：%v", err)
 					return err
 				}
 				s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出String数据 成功")
 
 			case "ble_json":
-				s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出Json数据 成功")
+				if s.sendJson, err = params[i].ObjectValue(); err != nil {
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的Json消息格式非法 ：%v", err)
+				}
+				sendbytes, err := json.Marshal(s.sendJson)
+				if err != nil { //控制BLE发出数据
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): JSON数据序列化失败%v", err)
+					return err
+				}
+				sendMesg := string(sendbytes)
+				if nil != at.BleSend(sendMesg) { //控制BLE发出数据
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出String数据 失败：%v", err)
+					return err
+				}
+				s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE发出String数据 成功")
 			}
 		}
 
