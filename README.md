@@ -1,6 +1,6 @@
 # BleAgentService
 ## branch
-- v3.1  
+- v3.1  暂存已提交
 > 支持napa版本
 > 实现通过Edgex Ui控件触发蓝牙模块的基本操作、String、Json数据的收发
 >
