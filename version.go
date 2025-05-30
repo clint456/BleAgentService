@@ -4,7 +4,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-package device
+package driver
 
 // Global version
 var Version string = "to be replaced by makefile"

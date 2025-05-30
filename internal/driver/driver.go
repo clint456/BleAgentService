@@ -22,9 +22,11 @@
 package driver
 
 import (
-	"errors"
+	errorDefault "errors"
 	"fmt"
+	"sync"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/edgexfoundry/device-sdk-go/v4/pkg/interfaces"
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
@@ -32,10 +34,14 @@ import (
 )
 
 type Driver struct {
-	sdk      interfaces.DeviceServiceSDK
-	lc       logger.LoggingClient
-	asyncCh  chan<- *dsModels.AsyncValues
-	deviceCh chan<- []dsModels.DiscoveredDevice
+	sdk              interfaces.DeviceServiceSDK
+	lc               logger.LoggingClient
+	asyncCh          chan<- *dsModels.AsyncValues
+	deviceCh         chan<- []dsModels.DiscoveredDevice
+	AsyncCh          chan<- *dsModels.AsyncValues
+	serviceConfig    *ServiceConfig
+	mqttClient       mqtt.Client
+	CommandResponses sync.Map
 }
 
 // Initialize performs protocol-specific initialization for the device
@@ -45,6 +51,7 @@ func (s *Driver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 	s.lc = sdk.LoggingClient()
 	s.asyncCh = sdk.AsyncValuesChannel()
 	s.deviceCh = sdk.DiscoveredDeviceChannel()
+	s.initalMqttClient() //初始化mqtt服务器
 
 	return nil
 }
@@ -82,23 +89,24 @@ func (s *Driver) Discover() error {
 // ValidateDevice triggers device's protocol properties validation, returns error
 // if validation failed and the incoming device will not be added into EdgeX
 func (s *Driver) ValidateDevice(device models.Device) error {
+
 	protocol, ok := device.Protocols["UART"]
 	if !ok {
-		return errors.New("Missing 'UART' protocols")
+		return errorDefault.New("Missing 'UART' protocols")
 	}
 
 	deviceLocation, ok := protocol["deviceLocation"]
 	if !ok {
-		return errors.New("Missing 'deviceLocation' information")
+		return errorDefault.New("Missing 'deviceLocation' information")
 	} else if deviceLocation == "" {
-		return errors.New("deviceLocation must not empty")
+		return errorDefault.New("deviceLocation must not empty")
 	}
 
 	baudRate, ok := protocol["baudRate"]
 	if !ok {
-		return errors.New("Missing 'baudRate' information")
+		return errorDefault.New("Missing 'baudRate' information")
 	} else if baudRate == "" {
-		return errors.New("baudRate must not empty")
+		return errorDefault.New("baudRate must not empty")
 	}
 
 	return nil

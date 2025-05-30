@@ -467,7 +467,7 @@ github.com/sirupsen/logrus
 # github.com/speps/go-hashids v2.0.0+incompatible
 ## explicit
 github.com/speps/go-hashids
-# github.com/spf13/cast v1.7.1
+# github.com/spf13/cast v1.8.0
 ## explicit; go 1.19
 github.com/spf13/cast
 # github.com/spiffe/go-spiffe/v2 v2.5.0
@@ -486,9 +486,6 @@ github.com/spiffe/go-spiffe/v2/spiffetls/tlsconfig
 github.com/spiffe/go-spiffe/v2/svid/jwtsvid
 github.com/spiffe/go-spiffe/v2/svid/x509svid
 github.com/spiffe/go-spiffe/v2/workloadapi
-# github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
-## explicit
-github.com/tarm/serial
 # github.com/tklauser/go-sysconf v0.3.12
 ## explicit; go 1.13
 github.com/tklauser/go-sysconf

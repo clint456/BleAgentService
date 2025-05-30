@@ -1,12 +1,13 @@
-module github.com/edgexfoundry/device-uart
+module github.com/clint456/ble-agent-device/driver
 
-go 1.23
+go 1.24.3
 
 require (
+	github.com/eclipse/paho.mqtt.golang v1.5.0
 	github.com/edgexfoundry/device-sdk-go/v4 v4.0.0
+	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.0.3
 	github.com/edgexfoundry/go-mod-core-contracts/v4 v4.0.1
-	github.com/spf13/cast v1.7.1
-	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
+	github.com/spf13/cast v1.8.0
 )
 
 require (
@@ -14,8 +15,6 @@ require (
 	github.com/OneOfOne/xxhash v1.2.8 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.5.0 // indirect
-	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.0.3 // indirect
 	github.com/edgexfoundry/go-mod-configuration/v4 v4.0.1 // indirect
 	github.com/edgexfoundry/go-mod-messaging/v4 v4.0.1 // indirect
 	github.com/edgexfoundry/go-mod-registry/v4 v4.0.1 // indirect
