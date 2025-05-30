@@ -90,11 +90,11 @@ func (a *AtCommand) BleInit_2() error {
 	// 使用循环发送命令
 	for _, cmd := range commands {
 		_, info, err := AtCommandSend(cmd, a.at_uart)
-		a.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> ATCommand: %v 的结果是:%v , error:%v ", cmd, info, err)
+		a.lc.Debugf("✅发送At指令中 %v 的结果是:%v , error:%v ", cmd, info, err)
 		if err != nil {
 			lastErr = err // 保存最后一次的错误（如果有）
 			// 可以选择在这里中断循环，或者继续执行其他命令
-			a.lc.Errorf("!!!!!!!!!!!!!!!!!!!!! ATCommand: %v 出现错误: %v ,输出为: %v", cmd, err, info)
+			a.lc.Errorf("❌发送At指令 %v 出现错误: %v ,输出为: %v", cmd, err, info)
 			// 这里选择抛出错误并继续执行所有命令，保留最后一次的错误
 		}
 	}
@@ -111,12 +111,11 @@ func (a *AtCommand) BleSendString(meg string) error {
 	// 拼接AT命令+消息，显式转换BleCommand为string并添加结尾
 	command := string(GATTSNTFY) + meg + "\r\n"
 	_, info, err := AtSendMesg(command, a.at_uart)
-	a.lc.Debugf(">>>>>>>>>>>>>>>>>>>>>>>> BleSend(): %v 的结果是:%v , 错误:%v ", command, info, err)
-
 	if err != nil {
-		a.lc.Errorf("!!!!!!!!!!!!!!!!!!!!! BleSend(): %v 出现错误: %v , 输出为: %v", command, err, info)
+		a.lc.Errorf("❌BleSendString(): %v 失败: %v , 输出为: %v", command, err, info)
 		return fmt.Errorf("发送mesg失败: %w", err)
 	}
+	a.lc.Debugf("✅ BleSendString(): %v 成功 :%v , 错误:%v ", command, info, err)
 
 	return nil
 }
@@ -144,7 +143,7 @@ func AtCommandSend(command BleCommand, u *Uart) (txlen int, rxbuf string, er err
 	if err != nil {
 		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT指令写入串口失败 %v", err)
 	}
-	if err := u.UartRead(128); err != nil {
+	if err := u.UartRead(64); err != nil {
 		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtCommandSend(): AT 串口读值有错误 %v", err)
 	}
 	// 读值无错误
@@ -161,13 +160,13 @@ func AtCommandSend(command BleCommand, u *Uart) (txlen int, rxbuf string, er err
 // 返回：消息发送长度、回显值、错误信息
 func AtSendMesg(mesg string, u *Uart) (txlen int, rxbuf string, er error) {
 	var err error
-
+	u.rxbuf = nil // 先将接收缓存区置空
 	// 写入状态查询AT指令 (使用切片发送)
 	_txlen, err := u.UartWrite([]byte(mesg))
 	if err != nil {
 		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtSendMesg(): Message写入串口失败 %v", err)
 	}
-	if err := u.UartRead(128); err != nil {
+	if err := u.UartRead(64); err != nil {
 		return _txlen, fmt.Sprintln("fail"), fmt.Errorf("AtSendMesg(): 串口读值有错误 %v", err)
 	}
 

@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	MTU        = 247
+	MTU        = 240
 	Prefix     = "AT+QBLEGATTSNTFY=0,fff2,"
 	Suffix     = "\r\n"
 	HeaderSize = 4

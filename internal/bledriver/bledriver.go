@@ -84,12 +84,21 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 
 		// check device is already initialized
 		if _, ok := s.uart[s.deviceLocation]; ok {
-			s.lc.Debugf("Driver.HandleReadCommands(): Device %v is already initialized with baud - %v, maxbytes - %v, timeout - %v", s.uart[s.deviceLocation], s.baudRate, key_maxbytes_value, key_timeout_value)
-
+			s.lc.Debugf("Driver.HandleReadCommands(): 🔥串口设备 %v 已经存在 baud - %v, maxbytes - %v, timeout - %v", s.uart[s.deviceLocation], s.baudRate, key_maxbytes_value, key_timeout_value)
 		} else {
 			// initialize device for the first time
-			s.uart[s.deviceLocation], _ = NewUart(s.deviceLocation, s.baudRate, key_timeout_value)
-			s.lc.Debugf("Driver.HandleReadCommands(): Device %v initialized for the first time with baud - %v, maxbytes - %v, timeout - %v", s.uart[s.deviceLocation], s.baudRate, key_maxbytes_value, key_timeout_value)
+			s.lc.Debugf("Driver.HandleReadCommands(): ⚡串口设备 %v 第一次初始化 baud - %v, maxbytes - %v, timeout - %v", s.uart[s.deviceLocation], s.baudRate, key_maxbytes_value, key_timeout_value)
+			s.uart[s.deviceLocation], err = NewUart(s.deviceLocation, s.baudRate, key_timeout_value)
+			if err != nil {
+				return nil, fmt.Errorf("❌BleDriver.HandleWriteCommands(): 串口设备对象 创建失败：%v", err)
+			}
+			s.lc.Debugf("BleDriver.HandleWriteCommands(): ⚡开始BLE初始化")
+			at := NewAtCommand(s.uart[s.deviceLocation], s.lc) // 创建AT指令控制对象
+			if nil != at.BleInit_2() {                         //初始化模式2，开启广播
+				s.lc.Errorf("❌BleDriver.HandleWriteCommands(): BLE初始化模式2 失败：%v", err)
+				return nil, fmt.Errorf("❌BleDriver.HandleWriteCommands():  BLE初始化模式2 失败：%v", err)
+			}
+			s.lc.Debugf("BleDriver.HandleWriteCommands(): 👌BLE初始化模块2 成功")
 		}
 
 		// Pass the received values to higher layers
@@ -105,7 +114,7 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 				s.uart[s.deviceLocation].rxbuf = nil
 				// 读取缓存区
 				if err := s.uart[s.deviceLocation].UartRead(key_maxbytes_value); err != nil {
-					return nil, fmt.Errorf("Driver.HandleReadCommands(): Reading UART failed: %v", err)
+					return nil, fmt.Errorf("❌Driver.HandleReadCommands(): Reading UART failed: %v", err)
 				}
 				rxbuf := string(s.uart[s.deviceLocation].rxbuf)
 				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, valueType, rxbuf)
@@ -117,7 +126,7 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 				s.uart[s.deviceLocation].rxbuf = nil
 				sta, err := CheckAtState(s.uart[s.deviceLocation])
 				if err != nil {
-					return nil, fmt.Errorf("读取蓝牙状态出现错误: %v", err)
+					return nil, fmt.Errorf("❌读取蓝牙状态出现错误: %v", err)
 				}
 				cv, err = dsModels.NewCommandValue(req.DeviceResourceName, "String", string(sta))
 				if err != nil {
@@ -133,12 +142,12 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 					return nil, fmt.Errorf(createCommandValueError, req.DeviceResourceName, err)
 				}
 			default:
-				return nil, fmt.Errorf("Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
+				return nil, fmt.Errorf("❌Driver.HandleReadCommands(): Unsupported value type: %v", valueType)
 			}
 
 			s.uart[s.deviceLocation].rxbuf = nil
 			result = cv
-			s.lc.Debugf("Driver.HandleReadCommands(): Response = %v", result)
+			s.lc.Debugf("✔ Driver.HandleReadCommands(): Response = %v", result)
 		}
 
 	}
@@ -150,14 +159,11 @@ func (s *BleDriver) handleReadCommandRequest(req dsModels.CommandRequest, resour
 func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest,
 	params []*dsModels.CommandValue) error {
 
-	var deviceLocation string
-	var baudRate int
-
 	for i, protocol := range protocols {
-		deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
-		baudRate, _ = cast.ToIntE(protocol["baudRate"])
+		s.deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
+		s.baudRate, _ = cast.ToIntE(protocol["baudRate"])
 
-		s.lc.Debugf("BleBleDriver.HandleWriteCommands(): protocol = %v, device location = %v, baud rate = %v", i, deviceLocation, baudRate)
+		s.lc.Debugf("BleBleDriver.HandleWriteCommands(): protocol = %v, device location = %v, baud rate = %v", i, s.deviceLocation, s.baudRate)
 	}
 
 	for i, req := range reqs {
@@ -172,28 +178,29 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 		if err != nil {
 			return err
 		}
-		if _, ok := s.uart[deviceLocation]; !ok {
-			s.uart[deviceLocation], err = NewUart(deviceLocation, baudRate, key_timeout_value)
+		if _, ok := s.uart[s.deviceLocation]; !ok {
+			s.uart[s.deviceLocation], err = NewUart(s.deviceLocation, s.baudRate, key_timeout_value)
 			if err != nil {
 				s.lc.Errorf("BleDriver.HandleWriteCommands(): 串口设备对象 创建失败：%v", err)
 				return err
 			}
 		}
-		at := NewAtCommand(s.uart[deviceLocation], s.lc) // 创建AT指令控制对象
+
+		at := NewAtCommand(s.uart[s.deviceLocation], s.lc) // 创建AT指令控制对象
 
 		key_type_value := fmt.Sprintf("%v", req.Attributes["type"])
 		if key_type_value == "ble" {
 			switch req.DeviceResourceName {
 			case "ble_init":
 				if s.initSwitch, err = params[i].BoolValue(); err != nil {
-					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取开关失败%v", err)
+					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取的Bool类型出现错误%v", err)
 				}
 				if s.initSwitch {
 					if nil != at.BleInit_2() { //初始化模式2，开启广播
 						s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE初始化模式2 失败：%v", err)
 						return err
 					}
-					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE初始化模块2 成功")
+					s.lc.Debugf("BleDriver.HandleWriteCommands(): 👌BLE初始化模块2 成功")
 				} else {
 					// TODO关闭蓝牙模块
 					s.lc.Debugf("BleDriver.HandleWriteCommands(): BLE关闭")
@@ -214,7 +221,7 @@ func (s *BleDriver) HandleWriteCommands(deviceName string, protocols map[string]
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): 获取发送的Json消息格式非法 ：%v", err)
 				}
 
-				if err = SendJSONOverUART(s.uart[deviceLocation].conn, []byte(s.sendJson.(string))); err != nil {
+				if err = SendJSONOverUART(s.uart[s.deviceLocation].conn, []byte(s.sendJson.(string))); err != nil {
 					s.lc.Errorf("BleDriver.HandleWriteCommands(): BLE发出Json数据 失败：%v", err)
 					return err
 				}
@@ -267,6 +274,7 @@ func (s *BleDriver) Stop(force bool) error {
 	if s.lc != nil {
 		s.lc.Debugf(fmt.Sprintf("BleBleDriver.Stop called: force=%v", force))
 	}
+	s.uart[s.deviceLocation].conn.Close() // 关闭串口对象
 	return nil
 }
 

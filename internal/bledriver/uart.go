@@ -46,10 +46,13 @@ func NewUart(dev string, baud int, timeout int) (*Uart, error) {
 	conn, err := serial.OpenPort(config)
 	if err != nil || conn == nil {
 		return nil, err
-
 	}
 	//成功创建
 	return &Uart{config: config, conn: conn, enable: true, portStatus: false}, nil
+}
+
+func (dev *Uart) UartClose() {
+	dev.conn.Close()
 }
 
 // 传入：读取串口缓冲取到rxbuf中
