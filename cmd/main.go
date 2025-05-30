@@ -8,7 +8,7 @@
 package main
 
 import (
-	"github.com/clint456/ble-agent-device/driver"
+	"internal/driver"
 
 	"github.com/edgexfoundry/device-sdk-go/v4/pkg/startup"
 )
