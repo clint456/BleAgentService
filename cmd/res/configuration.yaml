@@ -4,7 +4,7 @@ Writable:
 Service:
   Host: localhost
   Port: 59995
-  StartupMsg: device uart started
+  StartupMsg: ble-agent-service started
 
 Device:
   # These have common values (currently), but must be here for service local env overrides to apply when customized

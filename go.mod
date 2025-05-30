@@ -1,20 +1,21 @@
-module BleAgentService
+module ble-agent
 
 go 1.24.3
 
-replace internal/driver => ./internal/driver
-
-require github.com/edgexfoundry/device-sdk-go/v4 v4.0.0
+require (
+	github.com/eclipse/paho.mqtt.golang v1.5.0
+	github.com/edgexfoundry/device-sdk-go/v4 v4.0.0
+	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.0.3
+	github.com/edgexfoundry/go-mod-core-contracts/v4 v4.0.1
+	github.com/spf13/cast v1.8.0
+)
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/OneOfOne/xxhash v1.2.8 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
-	github.com/eclipse/paho.mqtt.golang v1.5.0 // indirect
-	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.0.3 // indirect
 	github.com/edgexfoundry/go-mod-configuration/v4 v4.0.1 // indirect
-	github.com/edgexfoundry/go-mod-core-contracts/v4 v4.0.1 // indirect
 	github.com/edgexfoundry/go-mod-messaging/v4 v4.0.1 // indirect
 	github.com/edgexfoundry/go-mod-registry/v4 v4.0.1 // indirect
 	github.com/edgexfoundry/go-mod-secrets/v4 v4.0.1 // indirect
@@ -91,7 +92,6 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/speps/go-hashids v2.0.0+incompatible // indirect
-	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect

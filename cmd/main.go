@@ -8,7 +8,8 @@
 package main
 
 import (
-	"internal/driver"
+	device "ble-agent"
+	driver "ble-agent/internal/driver"
 
 	"github.com/edgexfoundry/device-sdk-go/v4/pkg/startup"
 )
@@ -19,5 +20,5 @@ const (
 
 func main() {
 	d := driver.Driver{}
-	startup.Bootstrap(serviceName, driver.Version, &d)
+	startup.Bootstrap(serviceName, device.Version, &d)
 }

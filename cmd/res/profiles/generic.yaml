@@ -1,9 +1,9 @@
-name: "Uart-Generic-Device"
+name: "Uart-Ble-Device"
 manufacturer: "edgex"
-model: "edgex-uart"
+model: "ble-agent-service"
 labels:
-- "device-uart-example"
-description: "Example of Device-Uart"
+- "ble-agent-service-example"
+description: "Example of ble-agent-service"
 
 deviceResources:
 -

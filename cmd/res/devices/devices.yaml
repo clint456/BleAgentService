@@ -1,14 +1,14 @@
 # Pre-defined devices
 deviceList:
-  - name: "Uart-Generic-Device"
-    profileName: "Uart-Generic-Device"
+  - name: "Uart-Ble-Device"
+    profileName: "Uart-Ble-Device"
     description: "Example of Device UART"
     labels:
       - uart
-      - uart-generice-device
+      - uart-Ble-device
     protocols:
       UART:
-        deviceLocation: "/dev/ttyAMA2"
+        deviceLocation: "/dev/ttyS3"
         baudRate: 115200
     # autoEvents:
     #   - Interval: 20s

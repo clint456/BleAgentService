@@ -51,7 +51,7 @@ func (s *Driver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 	s.lc = sdk.LoggingClient()
 	s.asyncCh = sdk.AsyncValuesChannel()
 	s.deviceCh = sdk.DiscoveredDeviceChannel()
-	s.initalMqttClient() //初始化mqtt服务器
+	//s.initalMqttClient() //初始化mqtt服务器
 
 	return nil
 }
