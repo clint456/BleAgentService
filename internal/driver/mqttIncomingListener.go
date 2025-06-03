@@ -11,101 +11,37 @@ import (
 	"strings"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	sdkModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
-	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
 )
 
-func (s *Driver) onIncomingDataReceived(_ mqtt.Client, message mqtt.Message) {
-	var deviceName string
-	var sourceName string
+// onIncomingDataReceived 处理通过 MQTT 接收到的消息
+func (s *Driver) onIncomingDataReceived(client mqtt.Client, message mqtt.Message) {
 
-	var deviceResources []models.DeviceResource
+	// 获取接收到的消息主题
 	incomingTopic := message.Topic()
+	// 从消息主题中移除订阅主题部分，提取元数据
+	incomingTopic = strings.Replace(incomingTopic, "edgex", "", -1)
+	// 获取服务配置中的订阅主题，并移除通配符 "#"
 	subscribedTopic := s.serviceConfig.MQTTBrokerInfo.IncomingTopic
 	subscribedTopic = strings.Replace(subscribedTopic, "#", "", -1)
-	incomingTopic = strings.Replace(incomingTopic, subscribedTopic, "", -1)
-	metaData := strings.Split(incomingTopic, "/")
-	if len(metaData) != 2 {
-		s.lc.Errorf("[Incoming listener] Incoming data ignored, incoming topic data should have format .../<device_name>/<source_name>: `%s`", incomingTopic)
-		return
-	}
-	deviceName = metaData[0]
-	sourceName = metaData[1]
 
-	deviceCommand, ok := s.sdk.DeviceCommand(deviceName, sourceName)
-	if !ok {
-		deviceResource, ok := s.sdk.DeviceResource(deviceName, sourceName)
-		if !ok {
-			s.lc.Errorf("[Incoming listener] Incoming data ignored, source name `%s` not found as Device Command or Device Resource on the device `%s`", sourceName, deviceName)
-			return
-		}
-
-		if !strings.Contains(strings.ToUpper(deviceResource.Properties.ReadWrite), "R") {
-			s.lc.Errorf("[Incoming listener] Incoming data ignored, Device Resource `%s` not Readable", sourceName)
-			return
-		}
-
-		deviceResources = append(deviceResources, deviceResource)
-	} else {
-		if !strings.Contains(strings.ToUpper(deviceCommand.ReadWrite), "R") {
-			s.lc.Errorf("[Incoming listener] Incoming data ignored, Device Command `%s` not Readable", sourceName)
-			return
-		}
-
-		for _, resourceOperation := range deviceCommand.ResourceOperations {
-			deviceResource, ok := s.sdk.DeviceResource(deviceName, resourceOperation.DeviceResource)
-			if !ok {
-				s.lc.Errorf("[Incoming listener] Incoming data ignored, resource name `%s` from Device Command %s not found on the device `%s`", resourceOperation.DeviceResource, sourceName, deviceName)
-				return
-			}
-
-			deviceResources = append(deviceResources, deviceResource)
-		}
-	}
-
+	// 解析消息的 payload（JSON 格式）
 	asyncData := make(map[string]interface{})
 	err := json.Unmarshal(message.Payload(), &asyncData)
 	if err != nil {
-		// If the data received is for a single Device Resource is may just be the value, not JSON containing the name and value.
-		if len(deviceResources) == 1 {
-			asyncData[deviceResources[0].Name] = string(message.Payload())
-		} else {
-			s.lc.Errorf("[Incoming listener] Error un-marshaling incoming data : %v", err)
-			return
-		}
-	}
-
-	var commandValues []*sdkModels.CommandValue
-
-	for _, resource := range deviceResources {
-		asyncValue, ok := asyncData[resource.Name]
-		if !ok {
-			// If the data received is for a single Device Resource is may just be a JSON value, not JSON containing the name and value.
-			if len(deviceResources) == 1 {
-				asyncValue = string(message.Payload())
-			} else {
-				s.lc.Errorf("[Incoming listener] Incoming data ignored: Resource Name %s not found in payload (%s)", resource.Name, string(message.Payload()))
-				return
-			}
-		}
-
-		commandValue, err := s.newResult(resource, asyncValue)
-		if err != nil {
-			s.lc.Errorf("[Incoming listener] Incoming data ignored: %v", err)
-			return
-		}
-
-		commandValues = append(commandValues, commandValue)
+		s.lc.Errorf("❗️[EdgeX %v 服务数据监听] 反序列化payload失败 : %v", subscribedTopic, err)
 
 	}
 
-	asyncValues := &sdkModels.AsyncValues{
-		DeviceName:    deviceName,
-		SourceName:    sourceName,
-		CommandValues: commandValues,
+	// 记录接收到的消息信息
+	s.lc.Debugf("💬[EdgeX %v 服务数据监听] topic=%v, msg=%v", subscribedTopic, message.Topic(), string(message.Payload()))
+	// 创建MessageClient 并转发接收到的数据 到MessageBus 自定义主题"edgex/data/subscribedTopic"以供其它设备使用
+	// 转发到 MessageBus
+	err = s.publishToMessageBus(asyncData, "edgex/data"+incomingTopic)
+	if err != nil {
+		s.lc.Errorf("❗️[EdgeX %v 服务数据监听] 转发到 MessageBus 失败: %v", incomingTopic, err)
+		return
 	}
-
-	s.lc.Debugf("[Incoming listener] Incoming reading received: topic=%v msg=%v", message.Topic(), string(message.Payload()))
-
-	s.AsyncCh <- asyncValues
+	// 将接收到的数据向蓝牙发送器异步传输数据
+	// 异步传输到蓝牙发送器（占位）
+	go s.sendToBluetoothTransmitter(asyncData)
 }

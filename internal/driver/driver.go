@@ -31,6 +31,8 @@ import (
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
+	"github.com/edgexfoundry/go-mod-messaging/v4/messaging"
+	"github.com/labstack/gommon/log"
 )
 
 type Driver struct {
@@ -40,18 +42,39 @@ type Driver struct {
 	deviceCh         chan<- []dsModels.DiscoveredDevice
 	AsyncCh          chan<- *dsModels.AsyncValues
 	serviceConfig    *ServiceConfig
-	mqttClient       mqtt.Client
+	mqttClient       mqtt.Client             // 监听客户端
+	transmitClient   messaging.MessageClient //转发客户端
 	CommandResponses sync.Map
+	serial           *SerialPort
 }
 
 // Initialize performs protocol-specific initialization for the device
 // service.
 func (s *Driver) Initialize(sdk interfaces.DeviceServiceSDK) error {
+
 	s.sdk = sdk
 	s.lc = sdk.LoggingClient()
 	s.asyncCh = sdk.AsyncValuesChannel()
 	s.deviceCh = sdk.DiscoveredDeviceChannel()
-	//s.initalMqttClient() //初始化mqtt服务器
+
+	serial, err := NewSerialPort("/dev/ttyS3", 115200)
+	if err != nil {
+		log.Errorf("❌ 串口初始化失败: %v", err)
+		return err
+	}
+	s.serial = serial
+
+	controller := NewBleController(serial, true)
+	if err := controller.InitAsPeripheral(); err != nil {
+		log.Errorf("❌ BLE 初始化失败: %v", err)
+		return err
+	}
+	log.Debugf("✅ BLE 初始化为外围设备完成！")
+
+	if err := s.initialMqttClient(); err != nil {
+		log.Errorf("❌ MQTT 初始化失败: %v", err)
+		return err
+	}
 
 	return nil
 }
@@ -121,6 +144,7 @@ func (s *Driver) Stop(force bool) error {
 	if s.lc != nil {
 		s.lc.Debugf(fmt.Sprintf("Driver.Stop called: force=%v", force))
 	}
+	s.serial.Close()
 	return nil
 }
 

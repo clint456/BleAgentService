@@ -10,3 +10,26 @@ Device:
   # These have common values (currently), but must be here for service local env overrides to apply when customized
   ProfilesDir: "./res/profiles"
   DevicesDir: "./res/devices"
+
+MQTTBrokerInfo:
+  Schema: "tcp"
+  Host: "192.168.8.196"
+  Port: 1883
+  Qos: 0
+  KeepAlive: 3600
+  ClientId: "device-ble-agent"
+
+  CredentialsRetryTime: 120 # Seconds
+  CredentialsRetryWait: 1 # Seconds
+  ConnEstablishingRetry: 10
+  ConnRetryWaitTime: 5
+
+  AuthMode: "none"
+  CredentialsName: "credentials"
+
+  IncomingTopic: "edgex/events/#"
+
+  Writable:
+    ResponseFetchInterval: 500 # milliseconds
+
+

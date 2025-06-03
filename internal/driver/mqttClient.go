@@ -8,35 +8,42 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/errors"
+	"github.com/edgexfoundry/go-mod-messaging/v4/messaging"
+	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
+	"github.com/google/uuid"
 )
 
-func (s *Driver) initalMqttClient() error {
+func (s *Driver) initialMqttClient() error {
+	// 初始化监听客户端
 	s.serviceConfig = &ServiceConfig{}
 	if err := s.sdk.LoadCustomConfig(s.serviceConfig, CustomConfigSectionName); err != nil {
-		return fmt.Errorf("❌加载MQTTClint '%s' 自定义配置失败: %s", CustomConfigSectionName, err.Error())
+		return fmt.Errorf("❌ 加载MQTTClint '%s' 自定义配置失败: %s", CustomConfigSectionName, err.Error())
 	}
-	s.lc.Debugf("✌️MQTTClient自定义配置加载成功: %v", s.serviceConfig)
+	s.lc.Debugf("✅️ MQTTClient自定义配置加载成功: %v", s.serviceConfig)
 	if err := s.serviceConfig.MQTTBrokerInfo.Validate(); err != nil {
 		return errors.NewCommonEdgeXWrapper(err)
 	}
 	if err := s.sdk.ListenForCustomConfigChanges(
 		&s.serviceConfig.MQTTBrokerInfo.Writable,
 		WritableInfoSectionName, s.updateWritableConfig); err != nil {
-		return errors.NewCommonEdgeX(errors.Kind(err), fmt.Sprintf("‼️不能监听MQTTClint '%s' 自定义配置改动", WritableInfoSectionName), err)
+		return errors.NewCommonEdgeX(errors.Kind(err), fmt.Sprintf("‼❌️ 监听MQTTClint失败 '%s' 自定义配置改动", WritableInfoSectionName), err)
 	}
 
 	client, err := s.createMqttClient(s.serviceConfig)
 	if err != nil {
-		return errors.NewCommonEdgeX(errors.Kind(err), "‼️不能初始化MqttClient", err)
+		return errors.NewCommonEdgeX(errors.Kind(err), "‼❌️ 初始化MqttClient失败", err)
 	}
 	s.mqttClient = client
+
+	// 初始化转发客户端
+	s.transmitClient, err = s.NewMessageBusClient("tainsmitCient")
 	return nil
 }
 
 func (s *Driver) updateWritableConfig(rawWritableConfig interface{}) {
 	updated, ok := rawWritableConfig.(*WritableInfo)
 	if !ok {
-		s.lc.Error("❌unable to update writable config: Can not cast raw config to type 'WritableInfo'")
+		s.lc.Error("❌ 更新writeable配置失败：不能将config源数据反射为'WritableInfo'")
 		return
 	}
 	s.serviceConfig.MQTTBrokerInfo.Writable = *updated
@@ -67,7 +74,7 @@ func (s *Driver) createMqttClient(serviceConfig *ServiceConfig) (mqtt.Client, er
 		if err != nil && i >= serviceConfig.MQTTBrokerInfo.ConnEstablishingRetry {
 			return nil, errors.NewCommonEdgeXWrapper(err)
 		} else if err != nil {
-			s.lc.Warnf("‼️Unable to connect to MQTT broker, %s, retrying", err)
+			s.lc.Warnf("🔴 连接Mqtt代理服务器失败, %s, retrying", err)
 			time.Sleep(time.Duration(serviceConfig.MQTTBrokerInfo.ConnEstablishingRetry) * time.Second)
 			continue
 		}
@@ -77,7 +84,7 @@ func (s *Driver) createMqttClient(serviceConfig *ServiceConfig) (mqtt.Client, er
 }
 
 func (s *Driver) getMqttClient(clientID string, uri *url.URL, keepAlive int) (mqtt.Client, error) {
-	s.lc.Infof("⏩️Create MQTT client and connection: hostname=%v clientID=%v ", uri.Hostname(), clientID)
+	s.lc.Infof("⏩️ 创建Mqtt客户端并连接中: hostname=%v clientID=%v ", uri.Hostname(), clientID)
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("%s://%s", uri.Scheme, uri.Host))
 	opts.SetClientID(clientID)
@@ -99,25 +106,41 @@ func (s *Driver) getMqttClient(clientID string, uri *url.URL, keepAlive int) (mq
 
 func (s *Driver) onConnectHandler(client mqtt.Client) {
 	qos := byte(s.serviceConfig.MQTTBrokerInfo.Qos)
-	responseTopic := s.serviceConfig.MQTTBrokerInfo.ResponseTopic
 	incomingTopic := s.serviceConfig.MQTTBrokerInfo.IncomingTopic
 
 	token := client.Subscribe(incomingTopic, qos, s.onIncomingDataReceived)
 	if token.Wait() && token.Error() != nil {
 		client.Disconnect(0)
-		s.lc.Errorf("‼️could not subscribe to topic '%s': %s",
+		s.lc.Errorf("❌️ 不能订阅到'%s'主题: %s",
 			incomingTopic, token.Error().Error())
 		return
 	}
-	s.lc.Infof("📶订阅到'%s' 用于接收同步", incomingTopic)
+	s.lc.Infof("📶 成功订阅到 '%s' 用于接收同步", incomingTopic)
 
-	token = client.Subscribe(responseTopic, qos, s.onCommandResponseReceived)
-	if token.Wait() && token.Error() != nil {
-		client.Disconnect(0)
-		s.lc.Errorf("could not subscribe to topic '%s': %s",
-			responseTopic, token.Error().Error())
-		return
+}
+
+func (s *Driver) NewMessageBusClient(ClientID string) (messaging.MessageClient, errors.EdgeX) {
+	messageBus, err := messaging.NewMessageClient(types.MessageBusConfig{
+		Broker: types.HostInfo{
+			Host:     s.serviceConfig.MQTTBrokerInfo.Host,
+			Port:     s.serviceConfig.MQTTBrokerInfo.Port,
+			Protocol: s.serviceConfig.MQTTBrokerInfo.Schema,
+		},
+		Type: "mqtt",
+		Optional: map[string]string{
+			"ClientID": ClientID + uuid.New().String()},
+	})
+
+	if err != nil {
+		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 消息客户端失败: %v", err))
 	}
-	s.lc.Infof("📶Subscribed to topic '%s' for receiving the request response", responseTopic)
-
+	if messageBus == nil {
+		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 消息客户端为 nil"))
+	}
+	// 连接到 Broker
+	if err := messageBus.Connect(); err != nil {
+		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 连接到 MQTT Broker 失败: %v", err))
+	}
+	s.lc.Debugf("✅️ %v 消息客户端初始化成功", ClientID)
+	return messageBus, nil
 }

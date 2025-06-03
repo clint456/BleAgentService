@@ -92,16 +92,16 @@ func (s *Driver) SetCredentials(uri *url.URL, secretProvider interfaces.SecretPr
 	case AuthModeUsernamePassword:
 		credentials, err := s.GetCredentials(secretProvider, secretName)
 		if err != nil {
-			return fmt.Errorf("Unable to get %s MQTT credentials for secret name '%s': %s", category, secretName, err.Error())
+			return fmt.Errorf("❌️获取%s MQTT 证书密钥名称失败 '%s': %s", category, secretName, err.Error())
 		}
 
-		s.lc.Infof("%s MQTT credentials loaded", category)
+		s.lc.Infof("✅️%s MQTT认证已加载", category)
 		uri.User = url.UserPassword(credentials.Username, credentials.Password)
 
 	case AuthModeNone:
 		return nil
 	default:
-		return fmt.Errorf("invalid AuthMode '%s' for %s MQTT connection of", authMode, category)
+		return fmt.Errorf(" Mqtt的%s连接是非法认证模式 '%s'", category, authMode)
 	}
 
 	return nil
