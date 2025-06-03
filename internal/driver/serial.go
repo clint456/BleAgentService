@@ -2,6 +2,7 @@ package driver
 
 import (
 	"bufio"
+	"fmt"
 	"time"
 
 	"github.com/tarm/serial"
@@ -35,9 +36,30 @@ func (s *SerialPort) Write(cmd string) error {
 	return err
 }
 
-// 读取回应（读取到 \n）
-func (s *SerialPort) ReadLine() (string, error) {
-	return s.reader.ReadString('\n')
+func (sp *SerialPort) ReadLine() (string, error) {
+	if sp.reader == nil {
+		return "", fmt.Errorf("串口未打开")
+	}
+	return sp.reader.ReadString('\n')
+}
+
+// 读取指定大小的数据
+func (s *SerialPort) ReadExact(size int) ([]byte, error) {
+	buf := make([]byte, size)
+	total := 0
+
+	for total < size {
+		n, err := s.port.Read(buf[total:])
+		if err != nil {
+			return nil, err
+		}
+		if n == 0 {
+			break
+		}
+		total += n
+	}
+
+	return buf[:total], nil
 }
 
 // 关闭串口

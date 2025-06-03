@@ -3,6 +3,7 @@ package driver
 import (
 	"fmt"
 	"log"
+	"strings"
 )
 
 type Controller struct {
@@ -33,15 +34,44 @@ func NewBleController(sp *SerialPort, debug bool) *BleController {
 }
 
 func (b *BleController) sendCommand(cmd BleCommand) (string, error) {
-	err := b.serial.Write(string(cmd))
-	if err != nil {
-		return "", err
+	if err := b.serial.Write(string(cmd)); err != nil {
+		return "", fmt.Errorf("写入失败: %w", err)
 	}
-	resp, err := b.serial.ReadLine()
-	if b.debug {
-		log.Printf("🔄 Cmd: %q\n📥 Resp: %s\n❗Err: %v\n", cmd, resp, err)
+
+	var fullResponse string
+	for {
+		line, err := b.serial.ReadLine()
+		if err != nil {
+			return "", fmt.Errorf("读取失败: %w", err)
+		}
+		line = trimCRLF(line)
+
+		if line == "" {
+			continue // 跳过空行
+		}
+
+		if b.debug {
+			log.Printf("🧾 收到: %q", line)
+		}
+
+		fullResponse += line + "\n"
+
+		// 检查是否是结尾状态
+		if line == "OK" {
+			return fullResponse, nil
+		}
+		if line == "ERROR" {
+			return fullResponse, fmt.Errorf("命令返回 ERROR")
+		}
+		if strings.HasPrefix(line, "+CME ERROR:") {
+			return fullResponse, fmt.Errorf("模块错误: %s", line)
+		}
 	}
-	return resp, err
+}
+
+// trimCRLF 去除 AT 响应行首尾 CR/LF 字符
+func trimCRLF(s string) string {
+	return strings.Trim(s, "\r\n")
 }
 
 // 初始化为外围设备并启动广播
@@ -59,13 +89,11 @@ func (b *BleController) InitAsPeripheral() error {
 		ATADVSTART,
 	}
 
-	var lastErr error
 	for _, cmd := range commands {
 		_, err := b.sendCommand(cmd)
 		if err != nil {
-			lastErr = fmt.Errorf("❌ 命令 %q 执行失败: %v", cmd, err)
-			// 继续执行剩下命令，记录最后的错误
+			return err
 		}
 	}
-	return lastErr
+	return nil
 }
