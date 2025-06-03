@@ -26,17 +26,20 @@ func (s *Driver) initialMqttClient() error {
 	if err := s.sdk.ListenForCustomConfigChanges(
 		&s.serviceConfig.MQTTBrokerInfo.Writable,
 		WritableInfoSectionName, s.updateWritableConfig); err != nil {
-		return errors.NewCommonEdgeX(errors.Kind(err), fmt.Sprintf("‼❌️ 监听MQTTClint失败 '%s' 自定义配置改动", WritableInfoSectionName), err)
+		return errors.NewCommonEdgeX(errors.Kind(err), fmt.Sprintf("❌️ 监听MQTTClint失败 '%s' 自定义配置改动", WritableInfoSectionName), err)
 	}
 
 	client, err := s.createMqttClient(s.serviceConfig)
 	if err != nil {
-		return errors.NewCommonEdgeX(errors.Kind(err), "‼❌️ 初始化MqttClient失败", err)
+		return errors.NewCommonEdgeX(errors.Kind(err), "❌️ 初始化Mqtt监听失败", err)
 	}
 	s.mqttClient = client
 
 	// 初始化转发客户端
 	s.transmitClient, err = s.NewMessageBusClient("tainsmitCient")
+	if err != nil {
+		return errors.NewCommonEdgeX(errors.Kind(err), "❌️ 初始化Mqtt转发客户端失败", err)
+	}
 	return nil
 }
 

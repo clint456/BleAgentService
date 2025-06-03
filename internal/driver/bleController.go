@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
 type Controller struct {
@@ -37,7 +38,7 @@ func (b *BleController) sendCommand(cmd BleCommand) (string, error) {
 	if err := b.serial.Write(string(cmd)); err != nil {
 		return "", fmt.Errorf("写入失败: %w", err)
 	}
-
+	time.Sleep(1000 * time.Millisecond)
 	var fullResponse string
 	for {
 		line, err := b.serial.ReadLine()
