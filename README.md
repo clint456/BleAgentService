@@ -11,3 +11,5 @@
 > - 自动订阅edgex/events
 > - 将消息转发至 自定义消息主题: edgex/data/events/+/+/+
 > - 将消息下发至 手机模块
+
+[蓝牙调试助手smart-ble](https://github.com/LuoYaoSheng/smart-ble.git)
