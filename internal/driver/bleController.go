@@ -2,6 +2,7 @@ package driver
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"time"
@@ -16,15 +17,6 @@ func NewController(serial *SerialPort) *Controller {
 	return &Controller{serial: serial}
 }
 
-// 发送 AT 指令并返回响应
-func (c *Controller) SendATCommand(cmd string) (string, error) {
-	fullCmd := fmt.Sprintf("%s\r\n", cmd)
-	if err := c.serial.Write(fullCmd); err != nil {
-		return "", err
-	}
-	return c.serial.ReadLine()
-}
-
 type BleController struct {
 	serial *SerialPort
 	debug  bool
@@ -35,23 +27,35 @@ func NewBleController(sp *SerialPort, debug bool) *BleController {
 }
 
 func (b *BleController) sendCommand(cmd BleCommand) (string, error) {
-	if err := b.serial.Write(string(cmd)); err != nil {
+	if _, err := b.serial.Write([]byte(cmd)); err != nil {
 		return "", fmt.Errorf("写入失败: %w", err)
 	}
 	time.Sleep(1000 * time.Millisecond)
 	var fullResponse string
+	start := time.Now()
+	timeout := 3 * time.Second
 	for {
-		line, err := b.serial.ReadLine()
-		if err != nil {
-			return "", fmt.Errorf("读取失败: %w", err)
+		if time.Since(start) > timeout {
+			return "", fmt.Errorf("❌ 读取超时")
 		}
-		line = trimCRLF(line)
+		rawLine, err := b.serial.ReadLine()
+		line := string(rawLine)
+		if err != nil {
+			if err == io.EOF {
+				time.Sleep(20 * time.Millisecond) // 小延时再读
+				continue
+			}
+			return "", fmt.Errorf("❌ 读取失败: %w", err)
+		}
+
+		line = trimCRLF(line) // 注意这里传参
 
 		if line == "" {
 			continue // 跳过空行
 		}
 
 		if b.debug {
+			log.Printf("✳️  命令: %v", cmd)
 			log.Printf("🧾 收到: %q", line)
 		}
 
@@ -79,15 +83,16 @@ func trimCRLF(s string) string {
 func (b *BleController) InitAsPeripheral() error {
 	commands := []BleCommand{
 		ATRESET,
-		ATVERSION,
+		// ATVERSION,
 		ATINIT_2,
 		ATADV,
 		ATGATTSSRV,
 		ATGATTSCHAR,
 		ATGATTSSRVDONE,
 		ATNAME,
-		ATADDR,
+		// ATADDR,
 		ATADVSTART,
+		// ATQBLETRANMODE,
 	}
 
 	for _, cmd := range commands {

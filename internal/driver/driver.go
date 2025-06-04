@@ -25,6 +25,7 @@ import (
 	errorDefault "errors"
 	"fmt"
 	"sync"
+	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/edgexfoundry/device-sdk-go/v4/pkg/interfaces"
@@ -56,7 +57,7 @@ func (s *Driver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 	s.asyncCh = sdk.AsyncValuesChannel()
 	s.deviceCh = sdk.DiscoveredDeviceChannel()
 
-	serial, err := NewSerialPort("/dev/ttyS3", 115200)
+	serial, err := NewSerialPort("/dev/ttyS3", 115200, time.Millisecond)
 	if err != nil {
 		s.lc.Errorf("❌ 串口初始化失败: %v", err)
 		return err
@@ -105,6 +106,7 @@ func (s *Driver) HandleWriteCommands(deviceName string, protocols map[string]mod
 // ProtocolDriver.Initialize()
 func (s *Driver) Discover() error {
 	return fmt.Errorf("Discover function is yet to be implemented!")
+
 }
 
 // ValidateDevice triggers device's protocol properties validation, returns error

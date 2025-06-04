@@ -35,7 +35,8 @@ func (s *Driver) publishToMessageBus(data map[string]interface{}, topic string) 
 // sendToBluetoothTransmitter 异步传输到蓝牙发送器（占位实现）
 func (s *Driver) sendToBluetoothTransmitter(data map[string]interface{}) {
 	// 实现蓝牙异步传输逻辑
-	s.lc.Debugf("📡 [EdgeX %v 服务数据传输] 正在向蓝牙发送器传输数据: %v", s.serviceConfig.MQTTBrokerInfo.IncomingTopic, data)
+	s.lc.Debugf("📡 [EdgeX %v 服务数据传输] 正在向蓝牙发送器传输数据", s.serviceConfig.MQTTBrokerInfo.IncomingTopic)
 	// 具体蓝牙传输逻辑待实现
-
+	payload, _ := json.Marshal(data)
+	go SendJSONOverUART(s.ble.serial, payload)
 }
