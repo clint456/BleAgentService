@@ -1,8 +1,6 @@
 package driver
 
 import (
-	"encoding/json"
-
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 	"github.com/google/uuid"
 )
@@ -10,20 +8,20 @@ import (
 // publishToMessageBus 发布数据到 MessageBus
 func (s *Driver) publishToMessageBus(data map[string]interface{}, topic string) error {
 	// 序列化数据为 JSON
-	payload, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
+	// payload, err := json.Marshal(data)
+	// if err != nil {
+	// 	return err
+	// }
 
 	// 创建 MessageEnvelope
 	msgEnvelope := types.MessageEnvelope{
 		CorrelationID: "MessageEnvelope-" + uuid.New().String(), // 假设有生成关联 ID 的方法
-		Payload:       payload,
+		Payload:       data,
 		ContentType:   "application/json",
 	}
 
 	// 发布消息到 MessageBus
-	err = s.transmitClient.Publish(msgEnvelope, topic)
+	err := s.transmitClient.Publish(msgEnvelope, topic)
 	if err != nil {
 		return err
 	}
