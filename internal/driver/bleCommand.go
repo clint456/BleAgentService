@@ -13,5 +13,5 @@ const (
 	ATNAME         BleCommand = "AT+QBLENAME=QuecHCM111Z\r\n"
 	ATADDR         BleCommand = "AT+QBLEADDR?\r\n"
 	ATADVSTART     BleCommand = "AT+QBLEADVSTART\r\n"
-	ATQBLETRANMODE BleCommand = "AT+QBLETRANMODE=fff2\r\n"
+	// ATQBLETRANMODE BleCommand = "AT+QBLETRANMODE=fff2\r\n"
 )
