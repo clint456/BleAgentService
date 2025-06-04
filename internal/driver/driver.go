@@ -57,13 +57,14 @@ func (s *Driver) Initialize(sdk interfaces.DeviceServiceSDK) error {
 	s.asyncCh = sdk.AsyncValuesChannel()
 	s.deviceCh = sdk.DiscoveredDeviceChannel()
 
-	serial, err := NewSerialPort("/dev/ttyS3", 115200, time.Millisecond)
+	serial, err := NewSerialPort("/dev/ttyS3", 115200, true, time.Millisecond)
 	if err != nil {
 		s.lc.Errorf("❌ 串口初始化失败: %v", err)
 		return err
 	}
+	queue := NewSerialQueue(serial) // 初始化串口队列
 
-	s.ble = NewBleController(serial, true)
+	s.ble = NewBleController(serial, queue, true)
 	if err := s.ble.InitAsPeripheral(); err != nil {
 		s.lc.Errorf("❌ BLE 初始化失败: %v", err)
 		return err

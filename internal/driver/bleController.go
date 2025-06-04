@@ -8,22 +8,14 @@ import (
 	"time"
 )
 
-type Controller struct {
-	serial *SerialPort
-}
-
-// 创建控制器
-func NewController(serial *SerialPort) *Controller {
-	return &Controller{serial: serial}
-}
-
 type BleController struct {
 	serial *SerialPort
+	queue  *SerialQueue
 	debug  bool
 }
 
-func NewBleController(sp *SerialPort, debug bool) *BleController {
-	return &BleController{serial: sp, debug: debug}
+func NewBleController(sp *SerialPort, sq *SerialQueue, debug bool) *BleController {
+	return &BleController{serial: sp, queue: sq, debug: debug}
 }
 
 func (b *BleController) sendCommand(cmd BleCommand) (string, error) {
