@@ -19,7 +19,7 @@ const (
 	Prefix     = "AT+QBLEGATTSNTFY=0,fff2,"                   // AT 指令前缀
 	Suffix     = "\r\n"                                       // AT 指令后缀
 	HeaderSize = 4                                            // 分包头部：2 字节索引 + 2 字节总包数
-	MaxPayload = MTU - len(Prefix) - len(Suffix) - HeaderSize // 实际载荷大小：64 - 20 - 2 - 4 = 38 字节
+	MaxPayload = MTU - len(Prefix) - len(Suffix) - HeaderSize // 实际载荷大小：247 - 20 - 2 - 4 = 38 字节
 )
 
 // Packet 分包结构

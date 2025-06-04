@@ -42,6 +42,5 @@ func (s *Driver) onIncomingDataReceived(client mqtt.Client, message mqtt.Message
 		return
 	}
 	// 将接收到的数据向蓝牙发送器异步传输数据
-	// 异步传输到蓝牙发送器（占位）
-	go s.sendToBluetoothTransmitter(asyncData)
+	s.sendToBluetoothTransmitter(asyncData)
 }
