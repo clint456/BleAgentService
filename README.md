@@ -11,6 +11,8 @@
 > - 自动订阅edgex/events
 > - 将消息转发至 自定义消息主题: edgex/HyData/events/+/+/+
 > - 将消息下发至 Ble模块
-> - 
+> 
 
 （计划完成）监听来自手机与messageBus上用户（edgex/HyCommand/+/+/+）的命令请求，并发送回应至手机或messagebus上的用户（edgex/HyResponse/+/+/+）
+
+[蓝牙调试助手smart-ble](https://github.com/LuoYaoSheng/smart-ble.git)
