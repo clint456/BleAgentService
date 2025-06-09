@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -36,7 +37,7 @@ func (s *Driver) initialMqttClient() error {
 	s.mqttClient = client
 
 	// 初始化转发客户端
-	s.transmitClient, err = s.NewMessageBusClient("tainsmitCient")
+	s.transmitClient, err = s.InitMessageBusClient("tansmitCient", "192.168.8.196", 1883)
 	if err != nil {
 		return errors.NewCommonEdgeX(errors.Kind(err), "❌️ 初始化Mqtt转发客户端失败", err)
 	}
@@ -122,17 +123,20 @@ func (s *Driver) onConnectHandler(client mqtt.Client) {
 
 }
 
-func (s *Driver) NewMessageBusClient(ClientID string) (messaging.MessageClient, errors.EdgeX) {
+/* ============================ 以下是使用go-mod-messaging使用Mqtt ==============================*/
+
+func (s *Driver) InitMessageBusClient(ClientID string, Host string, Port int) (messaging.MessageClient, errors.EdgeX) {
 	messageBus, err := messaging.NewMessageClient(types.MessageBusConfig{
 		Broker: types.HostInfo{
-			Host:     s.serviceConfig.MQTTBrokerInfo.Host,
-			Port:     s.serviceConfig.MQTTBrokerInfo.Port,
-			Protocol: s.serviceConfig.MQTTBrokerInfo.Schema,
+			Host:     Host,
+			Port:     Port,
+			Protocol: "tcp",
 		},
 		Type: "mqtt",
 		Optional: map[string]string{
-			"ClientID": ClientID + uuid.New().String()},
-	})
+			"ClientId": ClientID,
+			"Username": "",
+			"Password": ""}})
 
 	if err != nil {
 		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 消息客户端失败: %v", err))
@@ -146,4 +150,23 @@ func (s *Driver) NewMessageBusClient(ClientID string) (messaging.MessageClient, 
 	}
 	s.lc.Debugf("✅️ %v 消息客户端初始化成功", ClientID)
 	return messageBus, nil
+}
+
+func (s *Driver) MessageBusPub(pub messaging.MessageClient, ClientID string, Topic string, data map[string]interface{}) errors.EdgeX {
+	//对Topic进行数据格式检验
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		s.lc.Error("❌ failed to marshal data: " + err.Error())
+	}
+	msgEnvelope := types.MessageEnvelope{
+		CorrelationID: ClientID + uuid.New().String(),
+		Payload:       payload,
+		ContentType:   "application/json",
+	}
+	err = pub.Publish(msgEnvelope, Topic)
+	if err != nil {
+		s.lc.Error("❌ failed to pub msgEnvelope: " + err.Error())
+	}
+	return nil
 }
