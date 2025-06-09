@@ -14,12 +14,10 @@ import (
 
 const (
 	MTU        = 247                                          // 蓝牙模块 MTU 限制为 64 字节
-	BlePort    = "/dev/ttyS3"                                 // 替换为实际串口设备路径（如 COM3 或 /dev/ttyS0）
-	BaudRate   = 115200                                       // 串口波特率，根据蓝牙模块配置调整
-	Prefix     = "AT+QBLEGATTSNTFY=0,fff2,"                   // AT 指令前缀
-	Suffix     = "\r\n"                                       // AT 指令后缀
+	Prefix     = "AT+QBLEGATTSNTFY=0,fff2,"                   // AT 指令前缀 (20字节）
+	Suffix     = "\r\n"                                       // AT 指令后缀 (2字节)
 	HeaderSize = 4                                            // 分包头部：2 字节索引 + 2 字节总包数
-	MaxPayload = MTU - len(Prefix) - len(Suffix) - HeaderSize // 实际载荷大小：247 - 20 - 2 - 4 = 38 字节
+	MaxPayload = MTU - len(Prefix) - len(Suffix) - HeaderSize // 实际载荷大小：247 - 20 - 2 - 4 = 221 字节
 )
 
 // Packet 分包结构
