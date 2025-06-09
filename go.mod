@@ -15,6 +15,7 @@ require (
 	github.com/OneOfOne/xxhash v1.2.8 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/clint456/edgex-messagebus-client v1.0.1 // indirect
 	github.com/edgexfoundry/go-mod-configuration/v4 v4.0.1 // indirect
 	github.com/edgexfoundry/go-mod-messaging/v4 v4.0.1 // indirect
 	github.com/edgexfoundry/go-mod-registry/v4 v4.0.1 // indirect
