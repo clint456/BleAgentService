@@ -9,7 +9,6 @@ require (
 	github.com/edgexfoundry/go-mod-core-contracts/v4 v4.0.1
 	github.com/edgexfoundry/go-mod-messaging/v4 v4.0.1
 	github.com/google/uuid v1.6.0
-	github.com/spf13/cast v1.8.0
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 )
 
@@ -94,6 +93,7 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/speps/go-hashids v2.0.0+incompatible // indirect
+	github.com/spf13/cast v1.8.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
