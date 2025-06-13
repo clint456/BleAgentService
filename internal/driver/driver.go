@@ -32,7 +32,6 @@ import (
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
-	"github.com/edgexfoundry/go-mod-messaging/v4/messaging"
 )
 
 // Driver BLE代理服务驱动程序
@@ -50,7 +49,6 @@ type Driver struct {
 	// 核心组件
 	bleController    *BLEController
 	messageBusClient *messagebus.Client
-	transmitClient   messaging.MessageClient
 
 	// 内部状态
 	commandResponses sync.Map
@@ -116,19 +114,12 @@ func (d *Driver) initializeMessageBus() error {
 		return fmt.Errorf("加载服务配置失败: %w", err)
 	}
 
-	// 创建监听客户端
+	// 创建统一的MessageBus客户端（同时用于监听和转发）
 	messageBusClient, err := d.createMessageBusClient()
 	if err != nil {
-		return fmt.Errorf("创建MessageBus监听客户端失败: %w", err)
+		return fmt.Errorf("创建MessageBus客户端失败: %w", err)
 	}
 	d.messageBusClient = messageBusClient
-
-	// 创建转发客户端
-	transmitClient, err := d.createTransmitClient()
-	if err != nil {
-		return fmt.Errorf("创建MessageBus转发客户端失败: %w", err)
-	}
-	d.transmitClient = transmitClient
 
 	d.logger.Info("MessageBus客户端初始化完成")
 	return nil
@@ -165,15 +156,6 @@ func (d *Driver) updateWritableConfig(rawWritableConfig interface{}) {
 	}
 	d.serviceConfig.MQTTBrokerInfo.Writable = *updated
 	d.logger.Info("配置已更新")
-}
-
-// createTransmitClient 创建转发客户端
-func (d *Driver) createTransmitClient() (messaging.MessageClient, error) {
-	return d.InitMessageBusClient(
-		"transmitClient",
-		d.serviceConfig.MQTTBrokerInfo.Host,
-		d.serviceConfig.MQTTBrokerInfo.Port,
-	)
 }
 
 // Start 启动设备服务
@@ -236,16 +218,10 @@ func (d *Driver) Stop(force bool) error {
 		d.logger.Infof("正在停止BLE代理服务 (force=%v)", force)
 	}
 
-	// 关闭MessageBus监听客户端
+	// 关闭MessageBus客户端
 	if d.messageBusClient != nil {
 		d.messageBusClient.Disconnect()
-		d.logger.Debug("MessageBus监听客户端已断开连接")
-	}
-
-	// 关闭MessageBus转发客户端
-	if d.transmitClient != nil {
-		d.transmitClient.Disconnect()
-		d.logger.Debug("MessageBus转发客户端已断开连接")
+		d.logger.Debug("MessageBus客户端已断开连接")
 	}
 
 	// 关闭BLE控制器和串口

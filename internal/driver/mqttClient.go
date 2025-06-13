@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	messagebus "github.com/clint456/edgex-messagebus-client"
-	"github.com/edgexfoundry/go-mod-core-contracts/v4/errors"
-	"github.com/edgexfoundry/go-mod-messaging/v4/messaging"
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 )
 
@@ -113,33 +111,4 @@ func (d *Driver) onMessageBusDataReceived(topic string, message types.MessageEnv
 	d.sendToBluetoothTransmitter(asyncData)
 
 	return nil
-}
-
-/* ============================ 以下是使用go-mod-messaging使用Mqtt ==============================*/
-
-func (d *Driver) InitMessageBusClient(ClientID string, Host string, Port int) (messaging.MessageClient, errors.EdgeX) {
-	messageBus, err := messaging.NewMessageClient(types.MessageBusConfig{
-		Broker: types.HostInfo{
-			Host:     Host,
-			Port:     Port,
-			Protocol: "tcp",
-		},
-		Type: "mqtt",
-		Optional: map[string]string{
-			"ClientId": ClientID,
-			"Username": "",
-			"Password": ""}})
-
-	if err != nil {
-		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 消息客户端失败: %v", err))
-	}
-	if messageBus == nil {
-		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 消息客户端为 nil"))
-	}
-	// 连接到 Broker
-	if err := messageBus.Connect(); err != nil {
-		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 连接到 MQTT Broker 失败: %v", err))
-	}
-	d.logger.Debugf("消息客户端 %s 初始化成功", ClientID)
-	return messageBus, nil
 }

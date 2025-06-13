@@ -81,7 +81,7 @@ func (c *BLEController) writeCommand(cmd BLECommand) error {
 	}
 
 	// 等待命令处理
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	return nil
 }
 

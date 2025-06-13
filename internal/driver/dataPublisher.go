@@ -1,21 +1,21 @@
 package driver
 
 import (
-	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
+	"fmt"
+
 	"github.com/google/uuid"
 )
 
 // publishToMessageBus 发布数据到MessageBus
 func (d *Driver) publishToMessageBus(data map[string]interface{}, topic string) error {
-	// 创建MessageEnvelope
-	msgEnvelope := types.MessageEnvelope{
-		CorrelationID: "MessageEnvelope-" + uuid.New().String(),
-		Payload:       data,
-		ContentType:   "application/json",
+	// 检查客户端是否已连接
+	if !d.messageBusClient.IsConnected() {
+		d.logger.Error("MessageBus客户端未连接")
+		return fmt.Errorf("MessageBus客户端未连接")
 	}
 
-	// 发布消息到MessageBus
-	err := d.transmitClient.Publish(msgEnvelope, topic)
+	// 使用统一的messagebus客户端发布消息
+	err := d.messageBusClient.PublishWithCorrelationID(topic, data, "MessageEnvelope-"+uuid.New().String())
 	if err != nil {
 		d.logger.Errorf("发布到MessageBus失败: %v", err)
 		return err
