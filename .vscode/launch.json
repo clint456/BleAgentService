@@ -1,0 +1,106 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug BLE Agent Service",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd",
+            "args": [
+                "-cp",
+                "-r",
+                "-rsh=192.168.8.216,192.168.8.196,0.0.0.0"
+            ],
+            "cwd": "${workspaceFolder}/cmd",
+            "env": {
+                "EDGEX_SECURITY_SECRET_STORE": "false"
+            },
+            "console": "integratedTerminal",
+            "preLaunchTask": "build",
+            "stopOnEntry": false,
+            "showLog": true,
+            "trace": "verbose",
+            "dlvFlags": [
+                "--check-go-version=false"
+            ]
+        },
+        {
+            "name": "Debug BLE Agent Service (No Build)",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd",
+            "args": [
+                "-cp",
+                "-r",
+                "-rsh=192.168.8.216,192.168.8.196,0.0.0.0"
+            ],
+            "cwd": "${workspaceFolder}/cmd",
+            "env": {
+                "EDGEX_SECURITY_SECRET_STORE": "false"
+            },
+            "console": "integratedTerminal",
+            "stopOnEntry": false,
+            "showLog": true,
+            "trace": "verbose",
+            "dlvFlags": [
+                "--check-go-version=false"
+            ]
+        },
+        {
+            "name": "Debug BLE Agent Service (Custom Args)",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd",
+            "args": [],
+            "cwd": "${workspaceFolder}/cmd",
+            "env": {
+                "EDGEX_SECURITY_SECRET_STORE": "false"
+            },
+            "console": "integratedTerminal",
+            "preLaunchTask": "build",
+            "stopOnEntry": false,
+            "showLog": true,
+            "trace": "verbose",
+            "dlvFlags": [
+                "--check-go-version=false"
+            ]
+        },
+        {
+            "name": "Debug with Breakpoint at main",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd",
+            "args": [
+                "-cp",
+                "-r",
+                "-rsh=192.168.8.216,192.168.8.196,0.0.0.0"
+            ],
+            "cwd": "${workspaceFolder}/cmd",
+            "env": {
+                "EDGEX_SECURITY_SECRET_STORE": "false"
+            },
+            "console": "integratedTerminal",
+            "preLaunchTask": "build",
+            "stopOnEntry": true,
+            "showLog": true,
+            "trace": "verbose",
+            "dlvFlags": [
+                "--check-go-version=false"
+            ]
+        },
+        {
+            "name": "Attach to Process",
+            "type": "go",
+            "request": "attach",
+            "mode": "local",
+            "processId": 0,
+            "dlvFlags": [
+                "--check-go-version=false"
+            ]
+        }
+    ]
+}
