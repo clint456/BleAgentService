@@ -33,7 +33,7 @@ func (d *Driver) sendToBluetoothTransmitter(data map[string]interface{}) {
 	// 这里需要通过BLE控制器发送数据
 	if d.bleController != nil {
 		// 将数据通过串口队列发送
-		// SendJSONOverUART(d.bleController.queue, data)
+		SendJSONOverUART(d.bleController.queue, data)
 		d.logger.Debug("数据已发送到蓝牙传输器")
 	} else {
 		d.logger.Warn("BLE控制器未初始化，无法发送数据")
