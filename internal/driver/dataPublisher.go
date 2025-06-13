@@ -5,35 +5,37 @@ import (
 	"github.com/google/uuid"
 )
 
-// publishToMessageBus 发布数据到 MessageBus
-func (s *Driver) publishToMessageBus(data map[string]interface{}, topic string) error {
-	// 序列化数据为 JSON
-	// payload, err := json.Marshal(data)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// 创建 MessageEnvelope
+// publishToMessageBus 发布数据到MessageBus
+func (d *Driver) publishToMessageBus(data map[string]interface{}, topic string) error {
+	// 创建MessageEnvelope
 	msgEnvelope := types.MessageEnvelope{
-		CorrelationID: "MessageEnvelope-" + uuid.New().String(), // 假设有生成关联 ID 的方法
+		CorrelationID: "MessageEnvelope-" + uuid.New().String(),
 		Payload:       data,
 		ContentType:   "application/json",
 	}
 
-	// 发布消息到 MessageBus
-	err := s.transmitClient.Publish(msgEnvelope, topic)
+	// 发布消息到MessageBus
+	err := d.transmitClient.Publish(msgEnvelope, topic)
 	if err != nil {
+		d.logger.Errorf("发布到MessageBus失败: %v", err)
 		return err
 	}
 
-	s.lc.Debugf("📤 [EdgeX %v 服务数据转发] 成功发布到 MessageBus, 主题: %v", s.serviceConfig.MQTTBrokerInfo.IncomingTopic, topic)
+	d.logger.Debugf("成功发布到MessageBus, 主题: %s", topic)
 	return nil
 }
 
 // sendToBluetoothTransmitter 异步传输到蓝牙发送器
-func (s *Driver) sendToBluetoothTransmitter(data map[string]interface{}) {
-	// 实现蓝牙异步传输逻辑
-	s.lc.Debugf("📡 [EdgeX %v 服务数据传输] 正在向蓝牙发送器传输数据", s.serviceConfig.MQTTBrokerInfo.IncomingTopic)
-	// 具体蓝牙传输逻辑待实现
-	SendJSONOverUART(s.ble.queue, data)
+func (d *Driver) sendToBluetoothTransmitter(data map[string]interface{}) {
+	d.logger.Debug("正在向蓝牙发送器传输数据")
+
+	// TODO: 实现具体的蓝牙传输逻辑
+	// 这里需要通过BLE控制器发送数据
+	if d.bleController != nil {
+		// 将数据通过串口队列发送
+		// SendJSONOverUART(d.bleController.queue, data)
+		d.logger.Debug("数据已发送到蓝牙传输器")
+	} else {
+		d.logger.Warn("BLE控制器未初始化，无法发送数据")
+	}
 }

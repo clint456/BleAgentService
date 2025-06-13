@@ -3,106 +3,174 @@ package driver
 import (
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"time"
+
+	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 )
 
+// SerialRequest 串口请求
 type SerialRequest struct {
-	Cmd      []byte
-	Timeout  time.Duration
-	Response chan SerialResponse
+	Command    []byte
+	Timeout    time.Duration
+	ResponseCh chan SerialResponse
 }
 
+// SerialResponse 串口响应
 type SerialResponse struct {
-	Data string
-	Err  error
+	Data  string
+	Error error
 }
 
+// SerialQueue 串口命令队列管理器
+// 职责：管理串口命令的队列化执行，确保命令的顺序性和响应的正确性
 type SerialQueue struct {
-	port    *SerialPort
-	reqChan chan SerialRequest
-	quit    chan struct{}
+	serialPort *SerialPort
+	requestCh  chan SerialRequest
+	stopCh     chan struct{}
+	logger     logger.LoggingClient
 }
 
-func NewSerialQueue(port *SerialPort) *SerialQueue {
-	q := &SerialQueue{
-		port:    port,
-		reqChan: make(chan SerialRequest),
-		quit:    make(chan struct{}),
+// NewSerialQueue 创建新的串口队列管理器
+func NewSerialQueue(port *SerialPort, logger logger.LoggingClient) *SerialQueue {
+	queue := &SerialQueue{
+		serialPort: port,
+		requestCh:  make(chan SerialRequest, 10), // 缓冲队列
+		stopCh:     make(chan struct{}),
+		logger:     logger,
 	}
-	go q.loop()
-	return q
+
+	go queue.processRequests()
+	logger.Info("串口队列管理器已启动")
+	return queue
 }
 
-func (q *SerialQueue) loop() {
+// SendCommand 发送命令并等待响应
+func (q *SerialQueue) SendCommand(command []byte, timeout time.Duration) (string, error) {
+	if len(command) == 0 {
+		return "", fmt.Errorf("命令不能为空")
+	}
+
+	responseCh := make(chan SerialResponse, 1)
+	request := SerialRequest{
+		Command:    command,
+		Timeout:    timeout,
+		ResponseCh: responseCh,
+	}
+
+	select {
+	case q.requestCh <- request:
+		// 请求已发送
+	case <-time.After(5 * time.Second):
+		return "", fmt.Errorf("请求队列已满，发送超时")
+	}
+
+	// 等待响应
+	response := <-responseCh
+	return response.Data, response.Error
+}
+
+// processRequests 处理串口请求队列
+func (q *SerialQueue) processRequests() {
 	for {
 		select {
-		case req := <-q.reqChan:
-			resp := q.handleRequest(req)
-			req.Response <- resp
-		case <-q.quit:
+		case request := <-q.requestCh:
+			response := q.executeRequest(request)
+			request.ResponseCh <- response
+		case <-q.stopCh:
+			q.logger.Info("串口队列处理器已停止")
 			return
 		}
 	}
 }
 
-func (q *SerialQueue) handleRequest(req SerialRequest) SerialResponse {
-	_, err := q.port.Write(req.Cmd)
-	if err != nil {
-		return SerialResponse{Err: fmt.Errorf("写入失败: %w", err)}
+// executeRequest 执行单个串口请求
+func (q *SerialQueue) executeRequest(request SerialRequest) SerialResponse {
+	// 写入命令
+	if err := q.writeCommand(request.Command); err != nil {
+		return SerialResponse{Error: fmt.Errorf("写入命令失败: %w", err)}
 	}
 
-	var fullResponse string
-	timeout := time.After(req.Timeout)
+	// 读取响应
+	data, err := q.readResponse(request.Timeout)
+	return SerialResponse{Data: data, Error: err}
+}
+
+// writeCommand 写入命令到串口
+func (q *SerialQueue) writeCommand(command []byte) error {
+	_, err := q.serialPort.Write(command)
+	if err != nil {
+		q.logger.Errorf("串口写入失败: %v", err)
+		return err
+	}
+
+	q.logger.Debugf("命令已发送: %s", strings.TrimSpace(string(command)))
+	return nil
+}
+
+// readResponse 读取串口响应
+func (q *SerialQueue) readResponse(timeout time.Duration) (string, error) {
+	var fullResponse strings.Builder
+	timeoutCh := time.After(timeout)
 
 	for {
 		select {
-		case <-timeout:
-			return SerialResponse{Err: fmt.Errorf("读取超时")}
+		case <-timeoutCh:
+			return "", fmt.Errorf("读取响应超时")
 		default:
-			line, err := q.port.ReadLine()
+			line, err := q.readLine()
 			if err != nil {
 				if err == io.EOF {
 					time.Sleep(10 * time.Millisecond)
 					continue
 				}
-				return SerialResponse{Err: fmt.Errorf("读取失败: %w", err)}
+				return "", fmt.Errorf("读取失败: %w", err)
 			}
-			str := strings.TrimRight(string(line), "\r\n")
-			if str == "" {
+
+			if line == "" {
 				continue
 			}
-			if q.port.Debug {
-				log.Printf("🧾 收到: %q", str)
-			}
-			fullResponse += str + "\n"
 
-			// 判定响应结束条件
-			if str == "OK" || str == "ERROR" || strings.HasPrefix(str, "+CME ERROR:") {
-				if str == "ERROR" {
-					return SerialResponse{Data: fullResponse, Err: fmt.Errorf("设备返回 ERROR")}
-				}
-				if strings.HasPrefix(str, "+CME ERROR:") {
-					return SerialResponse{Data: fullResponse, Err: fmt.Errorf("模块错误: %s", str)}
-				}
-				return SerialResponse{Data: fullResponse, Err: nil}
+			fullResponse.WriteString(line + "\n")
+			q.logger.Debugf("收到响应: %s", line)
+
+			if q.isTerminalResponse(line) {
+				return q.processTerminalResponse(fullResponse.String(), line)
 			}
 		}
 	}
 }
 
-func (q *SerialQueue) Send(cmd []byte, timeout time.Duration) (string, error) {
-	respChan := make(chan SerialResponse)
-	q.reqChan <- SerialRequest{
-		Cmd:      cmd,
-		Timeout:  timeout,
-		Response: respChan,
+// readLine 读取一行数据
+func (q *SerialQueue) readLine() (string, error) {
+	rawLine, err := q.serialPort.ReadLine()
+	if err != nil {
+		return "", err
 	}
-	resp := <-respChan
-	return resp.Data, resp.Err
+	return strings.TrimRight(string(rawLine), "\r\n"), nil
 }
 
+// isTerminalResponse 检查是否为终端响应
+func (q *SerialQueue) isTerminalResponse(line string) bool {
+	return line == "OK" || line == "ERROR" || strings.HasPrefix(line, "+CME ERROR:")
+}
+
+// processTerminalResponse 处理终端响应
+func (q *SerialQueue) processTerminalResponse(fullResponse, terminalLine string) (string, error) {
+	switch {
+	case terminalLine == "ERROR":
+		return fullResponse, fmt.Errorf("设备返回错误")
+	case strings.HasPrefix(terminalLine, "+CME ERROR:"):
+		return fullResponse, fmt.Errorf("模块错误: %s", terminalLine)
+	case terminalLine == "OK":
+		return fullResponse, nil
+	default:
+		return fullResponse, fmt.Errorf("未知的终端响应: %s", terminalLine)
+	}
+}
+
+// Close 关闭串口队列管理器
 func (q *SerialQueue) Close() {
-	close(q.quit)
+	close(q.stopCh)
+	q.logger.Info("串口队列管理器已关闭")
 }

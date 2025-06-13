@@ -3,129 +3,121 @@ package driver
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
-	"time"
 
-	mqtt "github.com/eclipse/paho.mqtt.golang"
+	messagebus "github.com/clint456/edgex-messagebus-client"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/errors"
 	"github.com/edgexfoundry/go-mod-messaging/v4/messaging"
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
-	"github.com/google/uuid"
 )
 
-func (s *Driver) initialMqttClient() error {
-	// 初始化监听客户端
-	s.serviceConfig = &ServiceConfig{}
-	if err := s.sdk.LoadCustomConfig(s.serviceConfig, CustomConfigSectionName); err != nil {
-		return fmt.Errorf("❌ 加载MQTTClint '%s' 自定义配置失败: %s", CustomConfigSectionName, err.Error())
-	}
-	s.lc.Debugf("✅️ MQTTClient自定义配置加载成功: %v", s.serviceConfig)
-	if err := s.serviceConfig.MQTTBrokerInfo.Validate(); err != nil {
-		return errors.NewCommonEdgeXWrapper(err)
-	}
-	if err := s.sdk.ListenForCustomConfigChanges(
-		&s.serviceConfig.MQTTBrokerInfo.Writable,
-		WritableInfoSectionName, s.updateWritableConfig); err != nil {
-		return errors.NewCommonEdgeX(errors.Kind(err), fmt.Sprintf("❌️ 监听MQTTClint失败 '%s' 自定义配置改动", WritableInfoSectionName), err)
+// createMessageBusClient 创建MessageBus监听客户端
+func (d *Driver) createMessageBusClient() (*messagebus.Client, error) {
+	// 配置MessageBus客户端
+	config := messagebus.Config{
+		Host:     d.serviceConfig.MQTTBrokerInfo.Host,
+		Port:     d.serviceConfig.MQTTBrokerInfo.Port,
+		Protocol: strings.ToLower(d.serviceConfig.MQTTBrokerInfo.Schema),
+		Type:     "mqtt",
+		ClientID: d.serviceConfig.MQTTBrokerInfo.ClientId,
+		QoS:      d.serviceConfig.MQTTBrokerInfo.Qos,
 	}
 
-	client, err := s.createMqttClient(s.serviceConfig)
-	if err != nil {
-		return errors.NewCommonEdgeX(errors.Kind(err), "❌️ 初始化Mqtt监听失败", err)
-	}
-	s.mqttClient = client
-
-	// 初始化转发客户端
-	s.transmitClient, err = s.InitMessageBusClient("tansmitCient", "192.168.8.196", 1883)
-	if err != nil {
-		return errors.NewCommonEdgeX(errors.Kind(err), "❌️ 初始化Mqtt转发客户端失败", err)
-	}
-	return nil
-}
-
-func (s *Driver) updateWritableConfig(rawWritableConfig interface{}) {
-	updated, ok := rawWritableConfig.(*WritableInfo)
-	if !ok {
-		s.lc.Error("❌ 更新writeable配置失败：不能将config源数据反射为'WritableInfo'")
-		return
-	}
-	s.serviceConfig.MQTTBrokerInfo.Writable = *updated
-}
-
-func (s *Driver) createMqttClient(serviceConfig *ServiceConfig) (mqtt.Client, errors.EdgeX) {
-	var scheme = serviceConfig.MQTTBrokerInfo.Schema
-	var brokerUrl = serviceConfig.MQTTBrokerInfo.Host
-	var brokerPort = serviceConfig.MQTTBrokerInfo.Port
-	var authMode = serviceConfig.MQTTBrokerInfo.AuthMode
-	var secretName = serviceConfig.MQTTBrokerInfo.CredentialsName
-	var mqttClientId = serviceConfig.MQTTBrokerInfo.ClientId
-	var keepAlive = serviceConfig.MQTTBrokerInfo.KeepAlive
-
-	uri := &url.URL{
-		Scheme: strings.ToLower(scheme),
-		Host:   fmt.Sprintf("%s:%d", brokerUrl, brokerPort),
-	}
-
-	err := s.SetCredentials(uri, s.sdk.SecretProvider(), "init", authMode, secretName)
-	if err != nil {
-		return nil, errors.NewCommonEdgeXWrapper(err)
-	}
-
-	var client mqtt.Client
-	for i := 0; i <= serviceConfig.MQTTBrokerInfo.ConnEstablishingRetry; i++ {
-		client, err = s.getMqttClient(mqttClientId, uri, keepAlive)
-		if err != nil && i >= serviceConfig.MQTTBrokerInfo.ConnEstablishingRetry {
-			return nil, errors.NewCommonEdgeXWrapper(err)
-		} else if err != nil {
-			s.lc.Warnf("🔴 连接Mqtt代理服务器失败, %s, retrying", err)
-			time.Sleep(time.Duration(serviceConfig.MQTTBrokerInfo.ConnEstablishingRetry) * time.Second)
-			continue
+	// 处理认证
+	if d.serviceConfig.MQTTBrokerInfo.AuthMode == AuthModeUsernamePassword {
+		credentials, err := d.GetCredentials(d.sdk.SecretProvider(), d.serviceConfig.MQTTBrokerInfo.CredentialsName)
+		if err != nil {
+			return nil, fmt.Errorf("获取MQTT认证信息失败: %w", err)
 		}
-		break
+		config.Username = credentials.Username
+		config.Password = credentials.Password
 	}
+
+	// 创建客户端
+	client, err := messagebus.NewClient(config, d.logger)
+	if err != nil {
+		return nil, fmt.Errorf("创建MessageBus客户端失败: %w", err)
+	}
+
+	// 连接到MessageBus
+	d.logger.Infof("连接到MessageBus: %s:%d", config.Host, config.Port)
+	if err := client.Connect(); err != nil {
+		return nil, fmt.Errorf("连接MessageBus失败: %w", err)
+	}
+
+	// 订阅主题
+	incomingTopic := d.serviceConfig.MQTTBrokerInfo.IncomingTopic
+	subscribeTopics := []string{incomingTopic}
+
+	if err := client.Subscribe(subscribeTopics, d.onMessageBusDataReceived); err != nil {
+		client.Disconnect()
+		return nil, fmt.Errorf("订阅主题 '%s' 失败: %w", incomingTopic, err)
+	}
+
+	d.logger.Infof("成功订阅到 '%s' 用于接收数据", incomingTopic)
 	return client, nil
 }
 
-func (s *Driver) getMqttClient(clientID string, uri *url.URL, keepAlive int) (mqtt.Client, error) {
-	s.lc.Infof("⏩️ 创建Mqtt客户端并连接中: hostname=%v clientID=%v ", uri.Hostname(), clientID)
-	opts := mqtt.NewClientOptions()
-	opts.AddBroker(fmt.Sprintf("%s://%s", uri.Scheme, uri.Host))
-	opts.SetClientID(clientID)
-	opts.SetUsername(uri.User.Username())
-	password, _ := uri.User.Password()
-	opts.SetPassword(password)
-	opts.SetKeepAlive(time.Second * time.Duration(keepAlive))
-	opts.SetAutoReconnect(true)
-	opts.OnConnect = s.onConnectHandler
+// onMessageBusDataReceived 处理通过新MessageBus库接收到的消息
+func (d *Driver) onMessageBusDataReceived(topic string, message types.MessageEnvelope) error {
+	// 获取接收到的消息主题
+	incomingTopic := topic
+	// 从消息主题中移除订阅主题部分，提取元数据
+	incomingTopic = strings.Replace(incomingTopic, "edgex", "", -1)
 
-	client := mqtt.NewClient(opts)
-	token := client.Connect()
-	if token.Wait() && token.Error() != nil {
-		return client, token.Error()
+	// 解析消息的 payload（JSON 格式）
+	asyncData := make(map[string]interface{})
+
+	// 处理不同类型的payload
+	var payloadBytes []byte
+	switch payload := message.Payload.(type) {
+	case []byte:
+		payloadBytes = payload
+	case string:
+		payloadBytes = []byte(payload)
+	default:
+		// 如果payload已经是map类型，直接使用
+		if data, ok := payload.(map[string]interface{}); ok {
+			asyncData = data
+		} else {
+			// 尝试序列化为JSON再解析
+			var err error
+			payloadBytes, err = json.Marshal(payload)
+			if err != nil {
+				d.logger.Errorf("序列化payload失败: %v", err)
+				return err
+			}
+		}
 	}
 
-	return client, nil
-}
-
-func (s *Driver) onConnectHandler(client mqtt.Client) {
-	qos := byte(s.serviceConfig.MQTTBrokerInfo.Qos)
-	incomingTopic := s.serviceConfig.MQTTBrokerInfo.IncomingTopic
-
-	token := client.Subscribe(incomingTopic, qos, s.onIncomingDataReceived)
-	if token.Wait() && token.Error() != nil {
-		client.Disconnect(0)
-		s.lc.Errorf("❌️ 不能订阅到'%s'主题: %s",
-			incomingTopic, token.Error().Error())
-		return
+	// 如果有payloadBytes，则解析JSON
+	if len(payloadBytes) > 0 {
+		err := json.Unmarshal(payloadBytes, &asyncData)
+		if err != nil {
+			d.logger.Errorf("反序列化payload失败: %v", err)
+			return err
+		}
 	}
-	s.lc.Infof("📶 成功订阅到 '%s' 用于接收同步", incomingTopic)
 
+	// 记录接收到的消息信息
+	d.logger.Debugf("收到消息 - 主题: %s, CorrelationID: %s", topic, message.CorrelationID)
+
+	// 转发到 MessageBus
+	err := d.publishToMessageBus(asyncData, "edgex/data"+incomingTopic)
+	if err != nil {
+		d.logger.Errorf("转发到MessageBus失败: %v", err)
+		return err
+	}
+
+	// 将接收到的数据向蓝牙发送器异步传输数据
+	d.sendToBluetoothTransmitter(asyncData)
+
+	return nil
 }
 
 /* ============================ 以下是使用go-mod-messaging使用Mqtt ==============================*/
 
-func (s *Driver) InitMessageBusClient(ClientID string, Host string, Port int) (messaging.MessageClient, errors.EdgeX) {
+func (d *Driver) InitMessageBusClient(ClientID string, Host string, Port int) (messaging.MessageClient, errors.EdgeX) {
 	messageBus, err := messaging.NewMessageClient(types.MessageBusConfig{
 		Broker: types.HostInfo{
 			Host:     Host,
@@ -148,25 +140,6 @@ func (s *Driver) InitMessageBusClient(ClientID string, Host string, Port int) (m
 	if err := messageBus.Connect(); err != nil {
 		return nil, errors.NewCommonEdgeXWrapper(fmt.Errorf("⛔️ 连接到 MQTT Broker 失败: %v", err))
 	}
-	s.lc.Debugf("✅️ %v 消息客户端初始化成功", ClientID)
+	d.logger.Debugf("消息客户端 %s 初始化成功", ClientID)
 	return messageBus, nil
-}
-
-func (s *Driver) MessageBusPub(pub messaging.MessageClient, ClientID string, Topic string, data map[string]interface{}) errors.EdgeX {
-	//对Topic进行数据格式检验
-
-	payload, err := json.Marshal(data)
-	if err != nil {
-		s.lc.Error("❌ failed to marshal data: " + err.Error())
-	}
-	msgEnvelope := types.MessageEnvelope{
-		CorrelationID: ClientID + uuid.New().String(),
-		Payload:       payload,
-		ContentType:   "application/json",
-	}
-	err = pub.Publish(msgEnvelope, Topic)
-	if err != nil {
-		s.lc.Error("❌ failed to pub msgEnvelope: " + err.Error())
-	}
-	return nil
 }

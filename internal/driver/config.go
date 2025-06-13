@@ -87,30 +87,30 @@ func fetchCommandTopic(protocols map[string]models.ProtocolProperties) (string, 
 	return commandTopicString, nil
 }
 
-func (s *Driver) SetCredentials(uri *url.URL, secretProvider interfaces.SecretProvider, category string, authMode string, secretName string) error {
+func (d *Driver) SetCredentials(uri *url.URL, secretProvider interfaces.SecretProvider, category string, authMode string, secretName string) error {
 	switch authMode {
 	case AuthModeUsernamePassword:
-		credentials, err := s.GetCredentials(secretProvider, secretName)
+		credentials, err := d.GetCredentials(secretProvider, secretName)
 		if err != nil {
-			return fmt.Errorf("❌️获取%s MQTT 证书密钥名称失败 '%s': %s", category, secretName, err.Error())
+			return fmt.Errorf("获取%s MQTT证书失败 '%s': %w", category, secretName, err)
 		}
 
-		s.lc.Infof("✅️%s MQTT认证已加载", category)
+		d.logger.Infof("%s MQTT认证已加载", category)
 		uri.User = url.UserPassword(credentials.Username, credentials.Password)
 
 	case AuthModeNone:
 		return nil
 	default:
-		return fmt.Errorf(" Mqtt的%s连接是非法认证模式 '%s'", category, authMode)
+		return fmt.Errorf("MQTT %s 连接认证模式 '%s' 不支持", category, authMode)
 	}
 
 	return nil
 }
 
-func (s *Driver) GetCredentials(secretProvider interfaces.SecretProvider, secretName string) (config.Credentials, error) {
+func (d *Driver) GetCredentials(secretProvider interfaces.SecretProvider, secretName string) (config.Credentials, error) {
 	credentials := config.Credentials{}
 
-	timer := startup.NewTimer(s.serviceConfig.MQTTBrokerInfo.CredentialsRetryTime, s.serviceConfig.MQTTBrokerInfo.CredentialsRetryWait)
+	timer := startup.NewTimer(d.serviceConfig.MQTTBrokerInfo.CredentialsRetryTime, d.serviceConfig.MQTTBrokerInfo.CredentialsRetryWait)
 
 	var secretData map[string]string
 	var err error
@@ -120,8 +120,8 @@ func (s *Driver) GetCredentials(secretProvider interfaces.SecretProvider, secret
 			break
 		}
 
-		s.lc.Warnf(
-			"Unable to retrieve MQTT credentials from SecretProvider at secret name '%s': %s. Retrying for %s",
+		d.logger.Warnf(
+			"无法从SecretProvider获取MQTT证书 '%s': %s. 重试中，剩余时间: %s",
 			secretName,
 			err.Error(),
 			timer.RemainingAsString())

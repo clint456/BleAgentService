@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # MQTT Broker (Eclipse Mosquitto)
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: edgex-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./docker/mosquitto/config:/mosquitto/config
+      - ./docker/mosquitto/data:/mosquitto/data
+      - ./docker/mosquitto/log:/mosquitto/log
+    networks:
+      - edgex-network
+    restart: unless-stopped
+
+  # EdgeX MessageBus Client Example
+  messagebus-client:
+    build: .
+    container_name: edgex-messagebus-client
+    depends_on:
+      - mosquitto
+    environment:
+      - MESSAGEBUS_HOST=mosquitto
+      - MESSAGEBUS_PORT=1883
+      - MESSAGEBUS_TYPE=mqtt
+      - MESSAGEBUS_PROTOCOL=tcp
+      - MESSAGEBUS_CLIENT_ID=docker-example-client
+      - MESSAGEBUS_QOS=1
+    networks:
+      - edgex-network
+    restart: unless-stopped
+    command: ["./main"]
+
+  # Advanced Example
+  messagebus-advanced:
+    build: .
+    container_name: edgex-messagebus-advanced
+    depends_on:
+      - mosquitto
+    environment:
+      - MESSAGEBUS_HOST=mosquitto
+      - MESSAGEBUS_PORT=1883
+      - MESSAGEBUS_TYPE=mqtt
+      - MESSAGEBUS_PROTOCOL=tcp
+      - MESSAGEBUS_CLIENT_ID=docker-advanced-client
+      - MESSAGEBUS_QOS=1
+    networks:
+      - edgex-network
+    restart: unless-stopped
+    command: ["./advanced"]
+
+  # MQTT Client for testing (optional)
+  mqtt-client:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt-test-client
+    depends_on:
+      - mosquitto
+    networks:
+      - edgex-network
+    entrypoint: |
+      sh -c "
+        echo 'Waiting for MQTT broker to be ready...'
+        sleep 10
+        echo 'Publishing test messages...'
+        while true; do
+          mosquitto_pub -h mosquitto -t 'edgex/test/message' -m '{\"test\": \"message\", \"timestamp\": \"'$$(date -Iseconds)'\"}'
+          sleep 30
+        done
+      "
+
+networks:
+  edgex-network:
+    driver: bridge
+
+volumes:
+  mosquitto-data:
+  mosquitto-log:

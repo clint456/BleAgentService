@@ -3,10 +3,7 @@ package driver
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
-	"io"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,10 +58,6 @@ func SendJSONOverUART(sq *SerialQueue, jsonData map[string]interface{}) error {
 	// 分包
 	packets := splitIntoPackets(dataBytes)
 
-	if err != nil {
-		log.Fatalf("Error opening serial port: %v", err)
-	}
-
 	// 发送分包并验证回显
 	for _, packet := range packets {
 		// 构造分包数据：前缀 + 头部（索引 + 总包数） + 载荷 + 后缀
@@ -75,7 +68,7 @@ func SendJSONOverUART(sq *SerialQueue, jsonData map[string]interface{}) error {
 		copy(packetData[len(Prefix)+HeaderSize:], packet.Payload)
 		copy(packetData[len(Prefix)+HeaderSize+len(packet.Payload):], Suffix)
 		// 通过串口发送
-		response, err := sq.Send(packetData, time.Millisecond)
+		response, err := sq.SendCommand(packetData, time.Millisecond)
 		if err != nil {
 			log.Printf("❗️ Error sending packet %d: %v", packet.Index, err)
 			continue
@@ -94,45 +87,4 @@ func SendJSONOverUART(sq *SerialQueue, jsonData map[string]interface{}) error {
 
 	log.Printf("✅️ All packets of Packet %v sent and verified.", tag)
 	return nil
-}
-
-func readResponse(port *SerialPort, index uint16) (string, error) {
-	var fullResponse string
-	start := time.Now()
-	timeout := 3 * time.Millisecond
-	for {
-		if time.Since(start) > timeout {
-			return "", fmt.Errorf("❌ 数据发送回显超时")
-		}
-		rawLine, err := port.ReadLine()
-		line := string(rawLine)
-		if err != nil {
-			if err == io.EOF {
-				time.Sleep(time.Millisecond) // 小延时再读
-				continue
-			}
-			return "", fmt.Errorf("❌ 数据发送回显读取失败: %w", err)
-		}
-
-		line = trimCRLF(line) // 注意这里传参
-
-		if line == "" {
-			continue // 跳过空行
-		}
-
-		fullResponse += line + "\n"
-
-		// 检查是否是结尾状态
-		if line == "OK" {
-			log.Printf("⚡ 发送子包 %v 成功", index)
-			return fullResponse, nil
-		}
-		if line == "ERROR" {
-			log.Printf("⛔️ 发送子包 %v 失败", index)
-			return fullResponse, fmt.Errorf("命令返回 ERROR")
-		}
-		if strings.HasPrefix(line, "+CME ERROR:") {
-			return fullResponse, fmt.Errorf("模块错误: %s", line)
-		}
-	}
 }

@@ -3,95 +3,139 @@ package driver
 import (
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"time"
+
+	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 )
 
-type BleController struct {
-	serial *SerialPort
-	queue  *SerialQueue
-	debug  bool
+// BLEController 蓝牙低功耗控制器
+// 职责：管理BLE设备的初始化、命令发送和状态控制
+type BLEController struct {
+	serialPort *SerialPort
+	queue      *SerialQueue
+	logger     logger.LoggingClient
 }
 
-func NewBleController(sp *SerialPort, sq *SerialQueue, debug bool) *BleController {
-	return &BleController{serial: sp, queue: sq, debug: debug}
-}
-
-func (b *BleController) sendCommand(cmd BleCommand) (string, error) {
-	if _, err := b.serial.Write([]byte(cmd)); err != nil {
-		return "", fmt.Errorf("写入失败: %w", err)
+// NewBLEController 创建新的BLE控制器
+func NewBLEController(port *SerialPort, queue *SerialQueue, logger logger.LoggingClient) *BLEController {
+	return &BLEController{
+		serialPort: port,
+		queue:      queue,
+		logger:     logger,
 	}
-	time.Sleep(1000 * time.Millisecond)
-	var fullResponse string
-	start := time.Now()
-	timeout := 3 * time.Second
-	for {
-		if time.Since(start) > timeout {
-			return "", fmt.Errorf("❌ 读取超时")
+}
+
+// InitializeAsPeripheral 初始化BLE设备为外围设备模式
+func (c *BLEController) InitializeAsPeripheral() error {
+	initCommands := []BLECommand{
+		CommandReset,
+		CommandInitPeripheral,
+		CommandSetAdvertisingParams,
+		CommandCreateGATTService,
+		CommandCreateGATTCharacteristic,
+		CommandCompleteGATTService,
+		CommandSetDeviceName,
+		CommandStartAdvertising,
+	}
+
+	for _, cmd := range initCommands {
+		if err := c.executeCommand(cmd); err != nil {
+			return fmt.Errorf("执行命令 %s 失败: %w", cmd, err)
 		}
-		rawLine, err := b.serial.ReadLine()
-		line := string(rawLine)
+	}
+
+	c.logger.Info("BLE设备已成功初始化为外围设备")
+	return nil
+}
+
+// executeCommand 执行单个BLE命令
+func (c *BLEController) executeCommand(cmd BLECommand) error {
+	response, err := c.sendCommandAndWaitResponse(cmd)
+	if err != nil {
+		return err
+	}
+
+	if !c.isSuccessResponse(response) {
+		return fmt.Errorf("命令执行失败: %s", response)
+	}
+
+	c.logger.Debugf("命令执行成功: %s", cmd)
+	return nil
+}
+
+// sendCommandAndWaitResponse 发送命令并等待响应
+func (c *BLEController) sendCommandAndWaitResponse(cmd BLECommand) (string, error) {
+	if err := c.writeCommand(cmd); err != nil {
+		return "", fmt.Errorf("写入命令失败: %w", err)
+	}
+
+	return c.readResponse()
+}
+
+// writeCommand 写入命令到串口
+func (c *BLEController) writeCommand(cmd BLECommand) error {
+	_, err := c.serialPort.Write([]byte(cmd))
+	if err != nil {
+		return fmt.Errorf("串口写入失败: %w", err)
+	}
+
+	// 等待命令处理
+	time.Sleep(100 * time.Millisecond)
+	return nil
+}
+
+// readResponse 读取命令响应
+func (c *BLEController) readResponse() (string, error) {
+	const responseTimeout = 3 * time.Second
+	const readInterval = 20 * time.Millisecond
+
+	var fullResponse strings.Builder
+	startTime := time.Now()
+
+	for time.Since(startTime) < responseTimeout {
+		line, err := c.readLine()
 		if err != nil {
 			if err == io.EOF {
-				time.Sleep(20 * time.Millisecond) // 小延时再读
+				time.Sleep(readInterval)
 				continue
 			}
-			return "", fmt.Errorf("❌ 读取失败: %w", err)
+			return "", fmt.Errorf("读取响应失败: %w", err)
 		}
-
-		line = trimCRLF(line) // 注意这里传参
 
 		if line == "" {
-			continue // 跳过空行
+			continue
 		}
 
-		if b.debug {
-			log.Printf("✳️  命令: %v", cmd)
-			log.Printf("🧾 收到: %q", line)
-		}
+		fullResponse.WriteString(line + "\n")
+		c.logger.Debugf("收到响应: %s", line)
 
-		fullResponse += line + "\n"
-
-		// 检查是否是结尾状态
-		if line == "OK" {
-			return fullResponse, nil
-		}
-		if line == "ERROR" {
-			return fullResponse, fmt.Errorf("命令返回 ERROR")
-		}
-		if strings.HasPrefix(line, "+CME ERROR:") {
-			return fullResponse, fmt.Errorf("模块错误: %s", line)
+		if c.isTerminalResponse(line) {
+			return fullResponse.String(), nil
 		}
 	}
+
+	return "", fmt.Errorf("读取响应超时")
 }
 
-// trimCRLF 去除 AT 响应行首尾 CR/LF 字符
-func trimCRLF(s string) string {
-	return strings.Trim(s, "\r\n")
+// readLine 读取一行数据并清理格式
+func (c *BLEController) readLine() (string, error) {
+	rawLine, err := c.serialPort.ReadLine()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.Trim(string(rawLine), "\r\n"), nil
 }
 
-// 初始化为外围设备并启动广播
-func (b *BleController) InitAsPeripheral() error {
-	commands := []BleCommand{
-		ATRESET,
-		// ATVERSION,
-		ATINIT_2,
-		ATADV,
-		ATGATTSSRV,
-		ATGATTSCHAR,
-		ATGATTSSRVDONE,
-		ATNAME,
-		// ATADDR,
-		ATADVSTART,
-		// ATQBLETRANMODE,
-	}
+// isTerminalResponse 检查是否为终端响应
+func (c *BLEController) isTerminalResponse(line string) bool {
+	return line == "OK" || line == "ERROR" || strings.HasPrefix(line, "+CME ERROR:")
+}
 
-	for _, cmd := range commands {
-		_, err := b.sendCommand(cmd)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+// isSuccessResponse 检查响应是否表示成功
+func (c *BLEController) isSuccessResponse(response string) bool {
+	return strings.Contains(response, "OK") &&
+		!strings.Contains(response, "ERROR") &&
+		!strings.Contains(response, "+CME ERROR:")
 }
