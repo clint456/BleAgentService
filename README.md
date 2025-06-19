@@ -182,24 +182,20 @@ deviceList:
 wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
 export PATH=$PATH:/usr/local/go/bin
-
-# 设置串口权限
-sudo usermod -a -G dialout $USER
-sudo chmod 666 /dev/ttyS3
 ```
 
 ### 2. 克隆和编译
 
 ```bash
 # 克隆项目
-git clone https://github.com/clint456/BleAgentService.git
-cd BleAgentService
+git clone https://github.com/clint456/device-ble-go.git
+cd device-ble-go
 
 # 安装依赖
 go mod tidy
 
 # 编译项目（已验证编译通过）
-go build -o ble-agent-service ./cmd
+make
 ```
 
 ### 3. 配置服务
@@ -218,10 +214,7 @@ MQTTBrokerInfo:
 
 ```bash
 # 直接启动
-./ble-agent-service -o -d -cp
-
-# 或者作为系统服务启动
-sudo systemctl start ble-agent-service
+./device-ble -o -d -cp
 ```
 
 ### 5. 验证运行
@@ -416,7 +409,7 @@ curl -X GET http://localhost:59995/api/v4/ping
 # 问题：编译失败
 # 解决：确保依赖正确安装
 go mod tidy
-go build -o ble-agent-service ./cmd
+make
 ```
 
 #### 2. 串口连接失败
@@ -447,11 +440,11 @@ sudo ufw status
 #### 4. BLE 初始化失败
 ```bash
 # 检查 AT 命令响应
-echo "AT+QVERSION" > /dev/ttyS3
+echo "AT+QVERSION\r\n" > /dev/ttyS3
 cat /dev/ttyS3
 
 # 重置 BLE 模块
-echo "AT+QRST" > /dev/ttyS3
+echo "AT+QRST\r\n" > /dev/ttyS3
 ```
 
 ### 监控和日志
@@ -461,10 +454,10 @@ echo "AT+QRST" > /dev/ttyS3
 export EDGEX_LOGGING_LEVEL=DEBUG
 
 # 查看实时日志
-journalctl -u ble-agent-service -f
+journalctl -u device-ble -f
 
 # 查看错误日志
-journalctl -u ble-agent-service --since "1 hour ago" -p err
+journalctl -u device-ble --since "1 hour ago" -p err
 
 # 监控系统资源
 htop
@@ -495,8 +488,6 @@ curl -X GET http://localhost:59882/api/v4/device/name/Uart-Ble-Device
 | 功能完整性 | ✅ 100% | 所有核心功能已实现 |
 | 文档完善度 | ✅ 优秀 | 详细的使用指南和API文档 |
 | 测试覆盖率 | 🔄 进行中 | 计划添加单元测试 |
-
-详细状态报告：[PROJECT_STATUS.md](PROJECT_STATUS.md)
 
 ## 🤝 贡献指南
 
@@ -563,8 +554,7 @@ curl -X GET http://localhost:59882/api/v4/device/name/Uart-Ble-Device
 
 ---
 
-**🎉 项目状态**: 生产就绪 | **📅 最后更新**: 2024年12月 | **👥 维护者**: BLE Agent Service 开发团队
+**🎉 项目状态**: 开发中 | **📅 最后更新**: 2025年6月 | **👥 维护者**: device-ble-go开发团队
 
-**💡 提示**: 本服务专为 Linux 系统设计，推荐在 Raspberry Pi 等嵌入式设备上使用。
 
 
