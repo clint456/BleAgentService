@@ -188,7 +188,7 @@ make
 
 ### 3. 运行服务
 ```bash
-./cmd/ble-agent-service -o -d -cp
+./cmd/device-ble -o -d -cp
 ```
 
 ## 注意事项
