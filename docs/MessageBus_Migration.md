@@ -183,12 +183,12 @@ go run messagebus_example.go
 
 ### 2. 编译项目
 ```bash
-go build -o ble-agent-service ./cmd
+make
 ```
 
 ### 3. 运行服务
 ```bash
-./ble-agent-service
+./cmd/ble-agent-service -o -d -cp
 ```
 
 ## 注意事项

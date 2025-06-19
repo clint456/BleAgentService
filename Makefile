@@ -5,11 +5,11 @@ ENABLE_FULL_RELRO=true
 # change the following boolean flag to enable or disable PIE for linux binaries which is needed for ASLR (Address Space Layout Randomization) on Linux, the ASLR support on Windows is enabled by default
 ENABLE_PIE=true
 
-MICROSERVICES=cmd/device-uart
+MICROSERVICES=cmd/device-ble
 
 .PHONY: $(MICROSERVICES)
 
-DOCKERS=docker_device_uart
+DOCKERS=docker_device_ble
 .PHONY: $(DOCKERS)
 
 VERSION=$(shell cat ./VERSION 2>/dev/null || echo 0.0.0)
@@ -20,7 +20,7 @@ ifeq ($(ENABLE_FULL_RELRO), true)
 	ENABLE_FULL_RELRO_GOFLAGS = -bindnow
 endif
 
-GOFLAGS=-ldflags "-X github.com/edgexfoundry/device-uart.Version=$(VERSION) \
+GOFLAGS=-ldflags "-X github.com/edgexfoundry/device-ble.Version=$(VERSION) \
                   -X github.com/edgexfoundry/device-sdk-go/v4/internal/common.SDKVersion=$(SDKVERSION) \
                   $(ENABLE_FULL_RELRO_GOFLAGS)" \
                    -trimpath -mod=readonly
@@ -37,7 +37,7 @@ build-nats:
 tidy:
 	go mod tidy
 
-cmd/device-uart:
+cmd/device-ble:
 	CGO_ENABLED=0 go build -tags "$(ADD_BUILD_TAGS)" $(GOFLAGS) -o $@ ./cmd
 
 unittest:
@@ -61,12 +61,12 @@ clean:
 
 docker: $(DOCKERS)
 
-docker_device_uart:
+docker_device_ble:
 	docker build \
 		--label "git_sha=$(GIT_SHA)" \
 		--build-arg ADD_BUILD_TAGS=$(ADD_BUILD_TAGS) \
-		-t edgexfoundry/device-uart:$(GIT_SHA) \
-		-t edgexfoundry/device-uart:$(VERSION)-dev \
+		-t edgexfoundry/device-ble:$(GIT_SHA) \
+		-t edgexfoundry/device-ble:$(VERSION)-dev \
 		.
 
 docker-nats:
