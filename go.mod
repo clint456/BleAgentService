@@ -1,4 +1,4 @@
-module ble-agent
+module device-ble
 
 go 1.24.3
 

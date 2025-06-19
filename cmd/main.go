@@ -8,14 +8,14 @@
 package main
 
 import (
-	device "ble-agent"
-	driver "ble-agent/internal/driver"
+	device "device-ble"
+	driver "device-ble/internal/driver"
 
 	"github.com/edgexfoundry/device-sdk-go/v4/pkg/startup"
 )
 
 const (
-	serviceName string = "ble-agent-service"
+	serviceName string = "device-ble"
 )
 
 func main() {
