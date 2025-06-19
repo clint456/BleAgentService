@@ -28,3 +28,4 @@ VERSION
 
 # mac preview
 .DS_Store
+cmd/device-ble
