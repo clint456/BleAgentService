@@ -1,23 +1,29 @@
 package driver
 
 import (
+	"device-ble/internal/interfaces"
 	"time"
 )
 
 // 配置接口
 type ConfigProvider interface {
-	GetSerialConfig() SerialConfig
-	GetMQTTConfig() MQTTConfig
+	GetSerialConfig() interfaces.SerialConfig
+	GetMQTTConfig() interfaces.MQTTConfig
+	GetConfig(key string) (interface{}, error)
 }
 
 // 具体实现
 type Config struct {
-	Serial SerialConfig
-	MQTT   MQTTConfig
+	Serial interfaces.SerialConfig
+	MQTT   interfaces.MQTTConfig
 }
 
-func (c *Config) GetSerialConfig() SerialConfig { return c.Serial }
-func (c *Config) GetMQTTConfig() MQTTConfig     { return c.MQTT }
+func (c *Config) GetSerialConfig() interfaces.SerialConfig { return c.Serial }
+func (c *Config) GetMQTTConfig() interfaces.MQTTConfig     { return c.MQTT }
+
+func (c *Config) GetConfig(key string) (interface{}, error) {
+	return nil, nil // 可根据需要实现具体逻辑
+}
 
 // 串口配置结构体
 type SerialConfig struct {

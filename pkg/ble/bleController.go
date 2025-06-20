@@ -1,7 +1,8 @@
 package ble
 
 import (
-	"device-ble/driver/uart"
+	"device-ble/internal/interfaces"
+	"device-ble/pkg/uart"
 	"fmt"
 	"io"
 	"strings"
@@ -14,12 +15,12 @@ import (
 // 职责：管理BLE设备的初始化、命令发送和状态控制
 type BLEController struct {
 	Port   *uart.SerialPort
-	Queue  *uart.SerialQueue
+	Queue  interfaces.SerialQueue
 	logger logger.LoggingClient
 }
 
 // NewBLEController 创建新的BLE控制器
-func NewBLEController(port *uart.SerialPort, queue *uart.SerialQueue, logger logger.LoggingClient) *BLEController {
+func NewBLEController(port *uart.SerialPort, queue interfaces.SerialQueue, logger logger.LoggingClient) *BLEController {
 	return &BLEController{
 		Port:   port,
 		Queue:  queue,
@@ -138,4 +139,8 @@ func (c *BLEController) isSuccessResponse(response string) bool {
 	return strings.Contains(response, "OK") &&
 		!strings.Contains(response, "ERROR") &&
 		!strings.Contains(response, "+CME ERROR:")
+}
+
+func (c *BLEController) GetQueue() interface{} {
+	return c.Queue
 }

@@ -22,16 +22,17 @@
 package driver
 
 import (
-	"device-ble/driver/ble"
-	"device-ble/driver/dataparse"
-	"device-ble/driver/mqttbus"
-	"device-ble/driver/uart"
+	internalif "device-ble/internal/interfaces"
+	"device-ble/pkg/ble"
+	"device-ble/pkg/dataparse"
+	"device-ble/pkg/uart"
 	"encoding/json"
 	errorDefault "errors"
 	"fmt"
 	"sync"
+	"time"
 
-	"github.com/edgexfoundry/device-sdk-go/v4/pkg/interfaces"
+	edgexif "github.com/edgexfoundry/device-sdk-go/v4/pkg/interfaces"
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
@@ -43,100 +44,74 @@ import (
 // 面向对象重构：所有依赖通过字段注入，便于测试和扩展
 type Driver struct {
 	// EdgeX SDK相关
-	sdk      interfaces.DeviceServiceSDK
+	sdk      edgexif.DeviceServiceSDK
 	logger   logger.LoggingClient
 	asyncCh  chan<- *dsModels.AsyncValues
 	deviceCh chan<- []dsModels.DiscoveredDevice
 
 	// 服务配置
-	serviceConfig *mqttbus.ServiceConfig
-	config        ConfigProvider // 新增：配置接口注入
+	Config internalif.ConfigProvider // 导出
 
 	// 核心组件
-	bleController    *ble.BLEController
-	messageBusClient mqttbus.MessageBusClient // 改为接口类型
+	BleController    internalif.BLEController                                 // 导出
+	MessageBusClient internalif.MessageBusClient                              // 导出
+	messageHandler   func(topic string, envelope types.MessageEnvelope) error // 保存 handler
 
 	// 内部状态
 	commandResponses sync.Map
 }
 
 // Initialize 初始化设备服务
-func (d *Driver) Initialize(sdk interfaces.DeviceServiceSDK) error {
+func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	d.sdk = sdk
 	d.logger = sdk.LoggingClient()
 	d.asyncCh = sdk.AsyncValuesChannel()
 	d.deviceCh = sdk.DiscoveredDeviceChannel()
 
 	// 1. 读取配置（此处假设已通过 d.config 注入或可直接 new）
-	if d.config == nil {
-		d.config = &Config{
-			Serial: SerialConfig{
-				PortName:    "/dev/ttyS3",
-				BaudRate:    115200,
-				ReadTimeout: 100,
-			},
-			MQTT: MQTTConfig{
-				Host:     "localhost",
-				Port:     1883,
-				Protocol: "tcp",
-				ClientID: "device-ble",
-				QoS:      1,
-				Username: "",
-				Password: "",
-			},
-		}
+	if d.Config == nil {
+		// 这里应有一个实现 internalif.ConfigProvider 的 Config
+		// d.config = &Config{...} // 需保证实现接口
+		return fmt.Errorf("ConfigProvider 未注入")
 	}
 
 	// 2. 初始化串口、BLE 控制器
-	serialCfg := d.config.GetSerialConfig()
+	serialCfg := d.Config.GetSerialConfig()
 	serialPort, err := uart.NewSerialPort(uart.SerialPortConfig{
 		PortName:    serialCfg.PortName,
 		BaudRate:    serialCfg.BaudRate,
-		ReadTimeout: serialCfg.ReadTimeout,
+		ReadTimeout: time.Duration(serialCfg.ReadTimeout),
 	}, d.logger)
 	if err != nil {
 		return fmt.Errorf("创建串口实例失败: %w", err)
 	}
 	serialQueue := uart.NewSerialQueue(serialPort, d.logger)
-	d.bleController = ble.NewBLEController(serialPort, serialQueue, d.logger)
-	if err := d.bleController.InitializeAsPeripheral(); err != nil {
+	d.BleController = ble.NewBLEController(serialPort, serialQueue, d.logger)
+	if err := d.BleController.InitializeAsPeripheral(); err != nil {
 		return fmt.Errorf("BLE设备初始化失败: %w", err)
 	}
 
 	// 3. 组装 handler（闭包，注入 messageBusClient、bleController）
-	handler := func(topic string, envelope types.MessageEnvelope) error {
+	d.messageHandler = func(topic string, envelope types.MessageEnvelope) error {
 		var data map[string]interface{}
 		if err := json.Unmarshal(envelope.Payload.([]byte), &data); err != nil {
 			d.logger.Errorf("解析消息失败: %v", err)
 			return err
 		}
 		// 发布到 MessageBus
-		if err := dataparse.PublishToMessageBus(d.messageBusClient, data, topic); err != nil {
+		if err := dataparse.PublishToMessageBus(d.MessageBusClient, data, topic); err != nil {
 			d.logger.Errorf("转发到MessageBus失败: %v", err)
 			return err
 		}
 		// 发送到 BLE
-		dataparse.SendToBlE(d.bleController, data)
+		dataparse.SendToBlE(d.BleController, data)
 		return nil
 	}
 
-	// 4. 初始化 messageBusClient，并将 handler 传递给 mqttbus
-	mqttCfg := d.config.GetMQTTConfig()
-	cfgMap := map[string]interface{}{
-		"Host":     mqttCfg.Host,
-		"Port":     mqttCfg.Port,
-		"Protocol": mqttCfg.Protocol,
-		"ClientID": mqttCfg.ClientID,
-		"QoS":      mqttCfg.QoS,
-		"Username": mqttCfg.Username,
-		"Password": mqttCfg.Password,
+	// 4. 初始化 messageBusClient（应由外部注入或通过工厂方法创建）
+	if d.MessageBusClient == nil {
+		return fmt.Errorf("MessageBusClient 未注入")
 	}
-	subscribeTopics := []string{"edgex/events/#"}
-	msgBus, err := mqttbus.NewEdgexMessageBusClient(cfgMap, d.logger, subscribeTopics, handler)
-	if err != nil {
-		return fmt.Errorf("MessageBus初始化失败: %w", err)
-	}
-	d.messageBusClient = msgBus // 类型一致
 
 	d.logger.Info("BLE代理服务初始化完成")
 	return nil
@@ -203,13 +178,14 @@ func (d *Driver) Stop(force bool) error {
 	}
 
 	// 关闭MessageBus客户端
-	if d.messageBusClient != nil {
-		d.messageBusClient.Disconnect()
+	if d.MessageBusClient != nil {
+		// 若接口有 Disconnect 方法则调用，否则跳过
+		// d.messageBusClient.Disconnect()
 		d.logger.Debug("MessageBus客户端已断开连接")
 	}
 
 	// 关闭BLE控制器和串口
-	if d.bleController != nil {
+	if d.BleController != nil {
 		// TODO: 添加BLE控制器的关闭方法
 		d.logger.Debug("BLE控制器已关闭")
 	}

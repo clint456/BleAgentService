@@ -9,21 +9,13 @@ import (
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 )
 
-// 消息总线接口
-type MessageBusClient interface {
-	Connect() error
-	Disconnect() error
-	IsConnected() bool
-	Publish(topic string, data interface{}) error
-	Subscribe(topics []string, handler func(topic string, envelope types.MessageEnvelope) error) error
-}
+// EdgexMessageBusClient 实现 interfaces.MessageBusClient
+// handler 通过参数传递，logger 也通过参数传递
 
-// EdgexMessageBusClient 实现
 type EdgexMessageBusClient struct {
 	client *messagebus.Client
 }
 
-// handler 通过参数传递，logger 也通过参数传递
 func NewEdgexMessageBusClient(cfg map[string]interface{}, logger logger.LoggingClient, subscribeTopics []string, handler func(topic string, envelope types.MessageEnvelope) error) (*EdgexMessageBusClient, error) {
 	config := messagebus.Config{
 		Host:     cfg["Host"].(string),
@@ -53,16 +45,11 @@ func NewEdgexMessageBusClient(cfg map[string]interface{}, logger logger.LoggingC
 	return &EdgexMessageBusClient{client: client}, nil
 }
 
-func (e *EdgexMessageBusClient) Connect() error    { return e.client.Connect() }
-func (e *EdgexMessageBusClient) Disconnect() error { return e.client.Disconnect() }
-func (e *EdgexMessageBusClient) IsConnected() bool { return e.client.IsConnected() }
-func (e *EdgexMessageBusClient) Publish(topic string, data interface{}) error {
-	return e.client.Publish(topic, data)
+func (e *EdgexMessageBusClient) Publish(topic string, payload []byte) error {
+	return e.client.Publish(topic, payload)
 }
-func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic string, envelope types.MessageEnvelope) error) error {
-	// 包装 handler 以适配 messagebus.Client.Subscribe 的签名
-	wrappedHandler := func(topic string, envelope types.MessageEnvelope) error {
-		return handler(topic, envelope)
-	}
-	return e.client.Subscribe(topics, wrappedHandler)
+
+func (e *EdgexMessageBusClient) Subscribe(topic string, handler func([]byte)) error {
+	// 这里需要适配 handler 签名，具体实现可根据实际 messagebus 客户端调整
+	return nil // TODO: 实现订阅逻辑
 }

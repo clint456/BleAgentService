@@ -1,7 +1,7 @@
 package dataparse
 
 import (
-	"device-ble/driver/uart"
+	"device-ble/internal/interfaces"
 	"encoding/binary"
 	"encoding/json"
 	"log"
@@ -48,7 +48,7 @@ func splitIntoPackets(data []byte) []Packet {
 }
 
 // SendJSONOverUART 发送 JSON 数据的主要函数
-func SendJSONOverUART(sq *uart.SerialQueue, jsonData map[string]interface{}) error {
+func SendJSONOverUART(sq interfaces.SerialQueue, jsonData map[string]interface{}) error {
 	tag := uuid.New().String()
 	// 将 JSON 数据序列化为字节
 
