@@ -16,7 +16,8 @@ type EdgexMessageBusClient struct {
 	client *messagebus.Client
 }
 
-func NewEdgexMessageBusClient(cfg map[string]interface{}, logger logger.LoggingClient, subscribeTopics []string, handler func(topic string, envelope types.MessageEnvelope) error) (*EdgexMessageBusClient, error) {
+// NewEdgexMessageBusClient 只负责初始化和连接，不注册 handler
+func NewEdgexMessageBusClient(cfg map[string]interface{}, logger logger.LoggingClient) (*EdgexMessageBusClient, error) {
 	config := messagebus.Config{
 		Host:     cfg["Host"].(string),
 		Port:     cfg["Port"].(int),
@@ -34,22 +35,20 @@ func NewEdgexMessageBusClient(cfg map[string]interface{}, logger logger.LoggingC
 	if err := client.Connect(); err != nil {
 		return nil, fmt.Errorf("连接MessageBus失败: %w", err)
 	}
-	// 包装 handler 以适配 messagebus.Client.Subscribe 的签名
+	return &EdgexMessageBusClient{client: client}, nil
+}
+
+// Subscribe 注册 handler
+func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic string, envelope types.MessageEnvelope) error) error {
 	wrappedHandler := func(topic string, envelope types.MessageEnvelope) error {
 		return handler(topic, envelope)
 	}
-	if err := client.Subscribe(subscribeTopics, wrappedHandler); err != nil {
-		client.Disconnect()
-		return nil, fmt.Errorf("订阅主题失败: %w", err)
+	if err := e.client.Subscribe(topics, wrappedHandler); err != nil {
+		return fmt.Errorf("订阅主题失败: %w", err)
 	}
-	return &EdgexMessageBusClient{client: client}, nil
+	return nil
 }
 
 func (e *EdgexMessageBusClient) Publish(topic string, payload []byte) error {
 	return e.client.Publish(topic, payload)
-}
-
-func (e *EdgexMessageBusClient) Subscribe(topic string, handler func([]byte)) error {
-	// 这里需要适配 handler 签名，具体实现可根据实际 messagebus 客户端调整
-	return nil // TODO: 实现订阅逻辑
 }
