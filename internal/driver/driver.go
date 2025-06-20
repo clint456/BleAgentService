@@ -24,9 +24,7 @@ package driver
 import (
 	internalif "device-ble/internal/interfaces"
 	"device-ble/pkg/ble"
-	"device-ble/pkg/dataparse"
 	"device-ble/pkg/uart"
-	"encoding/json"
 	errorDefault "errors"
 	"fmt"
 	"sync"
@@ -36,7 +34,6 @@ import (
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
-	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 )
 
 // Driver BLE代理服务驱动程序
@@ -53,9 +50,8 @@ type Driver struct {
 	Config internalif.ConfigProvider // 导出
 
 	// 核心组件
-	BleController    internalif.BLEController                                 // 导出
-	MessageBusClient internalif.MessageBusClient                              // 导出
-	messageHandler   func(topic string, envelope types.MessageEnvelope) error // 保存 handler
+	BleController    internalif.BLEController    // 导出
+	MessageBusClient internalif.MessageBusClient // 导出
 
 	// 内部状态
 	commandResponses sync.Map
@@ -89,23 +85,6 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	d.BleController = ble.NewBLEController(serialPort, serialQueue, d.logger)
 	if err := d.BleController.InitializeAsPeripheral(); err != nil {
 		return fmt.Errorf("BLE设备初始化失败: %w", err)
-	}
-
-	// 3. 组装 handler（闭包，注入 messageBusClient、bleController）
-	d.messageHandler = func(topic string, envelope types.MessageEnvelope) error {
-		var data map[string]interface{}
-		if err := json.Unmarshal(envelope.Payload.([]byte), &data); err != nil {
-			d.logger.Errorf("解析消息失败: %v", err)
-			return err
-		}
-		// 发布到 MessageBus
-		if err := dataparse.PublishToMessageBus(d.MessageBusClient, data, topic); err != nil {
-			d.logger.Errorf("转发到MessageBus失败: %v", err)
-			return err
-		}
-		// 发送到 BLE
-		dataparse.SendToBlE(d.BleController, data)
-		return nil
 	}
 
 	// 4. 初始化 messageBusClient（应由外部注入或通过工厂方法创建）

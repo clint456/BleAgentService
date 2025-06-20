@@ -12,9 +12,13 @@ import (
 	driverpkg "device-ble/internal/driver"
 	"device-ble/internal/interfaces"
 	"device-ble/pkg/ble"
+	"device-ble/pkg/dataparse"
 	"device-ble/pkg/mqttbus"
 	"device-ble/pkg/uart"
+	"encoding/json"
 	"time"
+
+	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 
 	"github.com/edgexfoundry/device-sdk-go/v4/pkg/startup"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
@@ -72,10 +76,39 @@ func main() {
 		"Password": mqttCfg.Password,
 	}
 	subscribeTopics := []string{"edgex/events/#"}
-	msgBus, err := mqttbus.NewEdgexMessageBusClient(cfgMap, log, subscribeTopics, nil)
+
+	// handler 需要 msgBus，但 msgBus 尚未创建。先定义 handlerFactory。
+	handlerFactory := func(msgBus interfaces.MessageBusClient) func(topic string, envelope types.MessageEnvelope) error {
+		return func(topic string, envelope types.MessageEnvelope) error {
+			var data map[string]interface{}
+			if err := json.Unmarshal(envelope.Payload.([]byte), &data); err != nil {
+				log.Errorf("解析消息失败: %v", err)
+				return err
+			}
+			// 发布到 MessageBus
+			if err := dataparse.PublishToMessageBus(msgBus, data, topic); err != nil {
+				log.Errorf("转发到MessageBus失败: %v", err)
+				return err
+			}
+			// 发送到 BLE
+			dataparse.SendToBlE(bleController, data)
+			return nil
+		}
+	}
+
+	var msgBus interfaces.MessageBusClient
+	msgBusImpl, err := mqttbus.NewEdgexMessageBusClient(cfgMap, log, subscribeTopics, nil) // 先创建空 handler
 	if err != nil {
 		panic(err)
 	}
+	msgBus = msgBusImpl
+
+	// 现在有了 msgBus，可以注册 handler
+	msgBusImpl2, err := mqttbus.NewEdgexMessageBusClient(cfgMap, log, subscribeTopics, handlerFactory(msgBus))
+	if err != nil {
+		panic(err)
+	}
+	msgBus = msgBusImpl2
 
 	// 6. 注入依赖
 	d := driverpkg.Driver{
