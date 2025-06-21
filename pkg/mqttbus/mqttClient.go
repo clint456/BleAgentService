@@ -41,6 +41,8 @@ func NewEdgexMessageBusClient(cfg map[string]interface{}, logger logger.LoggingC
 // Subscribe 注册 handler
 func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic string, envelope types.MessageEnvelope) error) error {
 	wrappedHandler := func(topic string, envelope types.MessageEnvelope) error {
+		// 加日志确认是否被调用
+		fmt.Printf("wrappedHandler被调用: topic=%s\n", topic)
 		return handler(topic, envelope)
 	}
 	if err := e.client.Subscribe(topics, wrappedHandler); err != nil {

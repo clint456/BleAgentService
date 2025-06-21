@@ -89,6 +89,7 @@ func main() {
 			log.Errorf("解析消息失败: %v", err)
 			return err
 		}
+		log.Infof("收到MQTT消息: topic=%s, payload=%s", topic, string(envelope.Payload.([]byte)))
 		// 发布到 MessageBus
 		if err := dataparse.PublishToMessageBus(msgBus, data, topic); err != nil {
 			log.Errorf("转发到MessageBus失败: %v", err)
