@@ -48,7 +48,7 @@ func splitIntoPackets(data []byte) []Packet {
 }
 
 // SendJSONOverUART 发送 JSON 数据的主要函数
-func SendJSONOverUART(sq interfaces.SerialQueue, jsonData map[string]interface{}) error {
+func SendJSONOverUART(sq interfaces.SerialQueue, jsonData interface{}) error {
 	tag := uuid.New().String()
 	// 将 JSON 数据序列化为字节
 

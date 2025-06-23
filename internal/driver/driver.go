@@ -41,11 +41,11 @@ import (
 // 面向对象重构：所有依赖通过字段注入，便于测试和扩展
 type Driver struct {
 	// EdgeX SDK相关
-	sdk      edgexif.DeviceServiceSDK
-	logger   logger.LoggingClient
-	asyncCh  chan<- *dsModels.AsyncValues
-	deviceCh chan<- []dsModels.DiscoveredDevice
-
+	sdk        edgexif.DeviceServiceSDK
+	logger     logger.LoggingClient
+	asyncCh    chan<- *dsModels.AsyncValues
+	deviceCh   chan<- []dsModels.DiscoveredDevice
+	BleReadyCh chan struct{}
 	// 服务配置
 	Config internalif.ConfigProvider // 导出
 
@@ -93,6 +93,8 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	}
 
 	d.logger.Info("BLE代理服务初始化完成")
+	// 完成初始化，释放 handler 的执行权
+	close(d.BleReadyCh)
 	return nil
 }
 

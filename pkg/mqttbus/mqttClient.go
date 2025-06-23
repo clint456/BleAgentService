@@ -43,6 +43,7 @@ func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic st
 	wrappedHandler := func(topic string, envelope types.MessageEnvelope) error {
 		// 加日志确认是否被调用
 		fmt.Printf("wrappedHandler被调用: topic=%s\n", topic)
+
 		return handler(topic, envelope)
 	}
 	if err := e.client.Subscribe(topics, wrappedHandler); err != nil {
@@ -51,6 +52,7 @@ func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic st
 	return nil
 }
 
-func (e *EdgexMessageBusClient) Publish(topic string, payload []byte) error {
-	return e.client.Publish(topic, payload)
+func (e *EdgexMessageBusClient) Publish(topic string, data interface{}) error {
+	transmitTopic := strings.Replace(topic, "edgex", "", -1)
+	return e.client.Publish("edgex/data"+transmitTopic, data)
 }

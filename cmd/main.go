@@ -15,7 +15,6 @@ import (
 	"device-ble/pkg/dataparse"
 	"device-ble/pkg/mqttbus"
 	"device-ble/pkg/uart"
-	"encoding/json"
 	"time"
 
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
@@ -28,7 +27,10 @@ const (
 	serviceName string = "device-ble"
 )
 
+var BleReady = make(chan struct{}) // 声明全局或传入参数
+
 func main() {
+
 	// 1. 组装配置
 	config := &driverpkg.Config{
 		Serial: interfaces.SerialConfig{
@@ -37,7 +39,7 @@ func main() {
 			ReadTimeout: 100,
 		},
 		MQTT: interfaces.MQTTConfig{
-			Host:     "localhost",
+			Host:     "192.168.8.196",
 			Port:     1883,
 			Protocol: "tcp",
 			ClientID: "device-ble",
@@ -84,19 +86,15 @@ func main() {
 	msgBus := msgBusImpl
 
 	handler := func(topic string, envelope types.MessageEnvelope) error {
-		var data map[string]interface{}
-		if err := json.Unmarshal(envelope.Payload.([]byte), &data); err != nil {
-			log.Errorf("解析消息失败: %v", err)
-			return err
-		}
-		log.Infof("收到MQTT消息: topic=%s, payload=%s", topic, string(envelope.Payload.([]byte)))
+		<-BleReady // 阻塞直到主线程初始化完成
+		log.Infof("收到MQTT消息: topic=%s, payload=%s", topic, envelope.Payload)
 		// 发布到 MessageBus
-		if err := dataparse.PublishToMessageBus(msgBus, data, topic); err != nil {
+		if err := dataparse.PublishToMessageBus(msgBus, envelope.Payload, topic); err != nil {
 			log.Errorf("转发到MessageBus失败: %v", err)
 			return err
 		}
 		// 发送到 BLE
-		dataparse.SendToBlE(bleController, data)
+		dataparse.SendToBlE(bleController, envelope.Payload)
 		return nil
 	}
 
@@ -109,6 +107,7 @@ func main() {
 		Config:           config,
 		BleController:    bleController,
 		MessageBusClient: msgBus,
+		BleReadyCh:       BleReady,
 	}
 
 	startup.Bootstrap(serviceName, device.Version, &d)

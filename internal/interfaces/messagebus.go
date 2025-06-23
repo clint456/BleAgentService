@@ -6,6 +6,6 @@ import "github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 // 实现应包含 Publish、Subscribe 等方法
 
 type MessageBusClient interface {
-	Publish(topic string, payload []byte) error
+	Publish(topic string, data interface{}) error
 	Subscribe(topics []string, handler func(topic string, envelope types.MessageEnvelope) error) error
 }

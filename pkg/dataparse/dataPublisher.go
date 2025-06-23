@@ -9,7 +9,8 @@ import (
 )
 
 // PublishToMessageBus 发布数据到MessageBus
-func PublishToMessageBus(client interfaces.MessageBusClient, data map[string]interface{}, topic string) error {
+func PublishToMessageBus(client interfaces.MessageBusClient, data interface{}, topic string) error {
+	// 数据类型断言
 	dataBytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("序列化数据失败: %v", err)
@@ -22,7 +23,7 @@ func PublishToMessageBus(client interfaces.MessageBusClient, data map[string]int
 }
 
 // SendToBlE 异步传输到蓝牙发送器
-func SendToBlE(controller interfaces.BLEController, data map[string]interface{}) {
+func SendToBlE(controller interfaces.BLEController, data interface{}) {
 	if controller != nil {
 		queueIface := controller.GetQueue()
 		if queue, ok := queueIface.(interfaces.SerialQueue); ok {
