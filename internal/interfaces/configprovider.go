@@ -3,21 +3,23 @@ package interfaces
 // ConfigProvider 定义配置获取的通用接口，供 driver、mqttbus 等包依赖
 
 type SerialConfig struct {
-	PortName    string
-	BaudRate    int
-	ReadTimeout int // 或 time.Duration，视实现而定
+	PortName    string `yaml:"portName"`
+	BaudRate    int    `yaml:"baudRate"`
+	ReadTimeout int    `yaml:"readTimeout"` // 单位毫秒
 }
 
 type MQTTConfig struct {
-	Host     string
-	Port     int
-	Protocol string
-	ClientID string
-	QoS      int
-	Username string
-	Password string
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Protocol string `yaml:"protocol"`
+	ClientID string `yaml:"clientID"`
+	QoS      int    `yaml:"qos"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
 }
 
+// 设计ConfigProvider接口
+// 使用者需要实现其包含的三个方法
 type ConfigProvider interface {
 	GetConfig(key string) (interface{}, error)
 	GetSerialConfig() SerialConfig

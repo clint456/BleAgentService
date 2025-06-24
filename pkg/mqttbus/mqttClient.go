@@ -1,6 +1,7 @@
 package mqttbus
 
 import (
+	internalif "device-ble/internal/interfaces"
 	"fmt"
 	"strings"
 
@@ -17,16 +18,16 @@ type EdgexMessageBusClient struct {
 }
 
 // NewEdgexMessageBusClient 只负责初始化和连接，不注册 handler
-func NewEdgexMessageBusClient(cfg map[string]interface{}, logger logger.LoggingClient) (*EdgexMessageBusClient, error) {
+func NewEdgexMessageBusClient(cfg internalif.MQTTConfig, logger logger.LoggingClient) (*EdgexMessageBusClient, error) {
 	config := messagebus.Config{
-		Host:     cfg["Host"].(string),
-		Port:     cfg["Port"].(int),
-		Protocol: strings.ToLower(cfg["Protocol"].(string)),
+		Host:     cfg.Host,
+		Port:     cfg.Port,
+		Protocol: cfg.Protocol,
 		Type:     "mqtt",
-		ClientID: cfg["ClientID"].(string),
-		QoS:      cfg["QoS"].(int),
-		Username: cfg["Username"].(string),
-		Password: cfg["Password"].(string),
+		ClientID: cfg.ClientID,
+		QoS:      cfg.QoS,
+		Username: cfg.Username,
+		Password: cfg.Password,
 	}
 	client, err := messagebus.NewClient(config, logger)
 	if err != nil {
@@ -54,5 +55,5 @@ func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic st
 
 func (e *EdgexMessageBusClient) Publish(topic string, data interface{}) error {
 	transmitTopic := strings.Replace(topic, "edgex", "", -1)
-	return e.client.Publish("edgex/data"+transmitTopic, data)
+	return e.client.Publish("edgex/service/data"+transmitTopic, data)
 }

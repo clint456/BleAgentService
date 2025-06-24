@@ -1,0 +1,13 @@
+serial:
+  portName: "/dev/ttyS3"
+  baudRate: 115200
+  readTimeout: 100
+
+mqtt:
+  host: "192.168.8.196"
+  port: 1883
+  protocol: "tcp"
+  clientID: "ble-client"
+  qos: 1
+  username: ""
+  password: ""

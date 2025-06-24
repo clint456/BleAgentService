@@ -24,11 +24,11 @@ package driver
 import (
 	internalif "device-ble/internal/interfaces"
 	"device-ble/pkg/ble"
+	"device-ble/pkg/mqttbus"
 	"device-ble/pkg/uart"
 	errorDefault "errors"
 	"fmt"
 	"sync"
-	"time"
 
 	edgexif "github.com/edgexfoundry/device-sdk-go/v4/pkg/interfaces"
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
@@ -41,17 +41,16 @@ import (
 // 面向对象重构：所有依赖通过字段注入，便于测试和扩展
 type Driver struct {
 	// EdgeX SDK相关
-	sdk        edgexif.DeviceServiceSDK
-	logger     logger.LoggingClient
-	asyncCh    chan<- *dsModels.AsyncValues
-	deviceCh   chan<- []dsModels.DiscoveredDevice
-	BleReadyCh chan struct{}
+	sdk      edgexif.DeviceServiceSDK
+	logger   logger.LoggingClient
+	asyncCh  chan<- *dsModels.AsyncValues
+	deviceCh chan<- []dsModels.DiscoveredDevice
 	// 服务配置
-	Config internalif.ConfigProvider // 导出
+	Config internalif.ConfigProvider
 
 	// 核心组件
-	BleController    internalif.BLEController    // 导出
-	MessageBusClient internalif.MessageBusClient // 导出
+	BleController    internalif.BLEController
+	MessageBusClient internalif.MessageBusClient
 
 	// 内部状态
 	commandResponses sync.Map
@@ -73,11 +72,7 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 
 	// 2. 初始化串口、BLE 控制器
 	serialCfg := d.Config.GetSerialConfig()
-	serialPort, err := uart.NewSerialPort(uart.SerialPortConfig{
-		PortName:    serialCfg.PortName,
-		BaudRate:    serialCfg.BaudRate,
-		ReadTimeout: time.Duration(serialCfg.ReadTimeout),
-	}, d.logger)
+	serialPort, err := uart.NewSerialPort(serialCfg, d.logger)
 	if err != nil {
 		return fmt.Errorf("创建串口实例失败: %w", err)
 	}
@@ -87,20 +82,22 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 		return fmt.Errorf("BLE设备初始化失败: %w", err)
 	}
 
-	// 4. 初始化 messageBusClient（应由外部注入或通过工厂方法创建）
-	if d.MessageBusClient == nil {
-		return fmt.Errorf("MessageBusClient 未注入")
+	// 3. 初始化 messageBusClient
+	mqttClientConfig := d.Config.GetMQTTConfig()
+	d.MessageBusClient, err = mqttbus.NewEdgexMessageBusClient(mqttClientConfig, d.logger)
+	if err != nil {
+		return fmt.Errorf("MessageBusClient 创建失败")
 	}
 
 	d.logger.Info("BLE代理服务初始化完成")
-	// 完成初始化，释放 handler 的执行权
-	close(d.BleReadyCh)
 	return nil
 }
 
 // Start 启动设备服务
 func (d *Driver) Start() error {
-	d.logger.Info("BLE代理服务已启动")
+	d.logger.Info("正在启动透明代理……")
+	// 将传感器数据转发到指定主题上
+
 	return nil
 }
 

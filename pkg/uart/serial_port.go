@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	internalif "device-ble/internal/interfaces"
+
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/tarm/serial"
 )
@@ -26,19 +28,14 @@ type SerialPort struct {
 	reader *bufio.Reader
 	mutex  sync.RWMutex
 	logger logger.LoggingClient
-	config SerialPortConfig
 }
 
 // NewSerialPort 创建新的串口实例
-func NewSerialPort(config SerialPortConfig, logger logger.LoggingClient) (*SerialPort, error) {
-	if err := validateConfig(config); err != nil {
-		return nil, fmt.Errorf("串口配置无效: %w", err)
-	}
-
+func NewSerialPort(config internalif.SerialConfig, logger logger.LoggingClient) (*SerialPort, error) {
 	serialConfig := &serial.Config{
 		Name:        config.PortName,
 		Baud:        config.BaudRate,
-		ReadTimeout: config.ReadTimeout,
+		ReadTimeout: time.Duration(config.ReadTimeout),
 	}
 
 	port, err := serial.OpenPort(serialConfig)
@@ -50,7 +47,6 @@ func NewSerialPort(config SerialPortConfig, logger logger.LoggingClient) (*Seria
 		port:   port,
 		reader: bufio.NewReader(port),
 		logger: logger,
-		config: config,
 	}
 
 	logger.Infof("串口已打开: %s, 波特率: %d", config.PortName, config.BaudRate)
@@ -109,24 +105,5 @@ func (sp *SerialPort) Close() error {
 	}
 
 	sp.logger.Info("串口已关闭")
-	return nil
-}
-
-// GetConfig 获取串口配置
-func (sp *SerialPort) GetConfig() SerialPortConfig {
-	return sp.config
-}
-
-// validateConfig 验证串口配置
-func validateConfig(config SerialPortConfig) error {
-	if config.PortName == "" {
-		return fmt.Errorf("串口名称不能为空")
-	}
-	if config.BaudRate <= 0 {
-		return fmt.Errorf("波特率必须大于0")
-	}
-	if config.ReadTimeout < 0 {
-		return fmt.Errorf("读取超时时间不能为负数")
-	}
 	return nil
 }
