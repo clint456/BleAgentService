@@ -65,8 +65,6 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 
 	// 1. 读取配置（此处假设已通过 d.config 注入或可直接 new）
 	if d.Config == nil {
-		// 这里应有一个实现 internalif.ConfigProvider 的 Config
-		// d.config = &Config{...} // 需保证实现接口
 		return fmt.Errorf("ConfigProvider 未注入")
 	}
 
@@ -76,7 +74,8 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	if err != nil {
 		return fmt.Errorf("创建串口实例失败: %w", err)
 	}
-	serialQueue := uart.NewSerialQueue(serialPort, d.logger)
+
+	serialQueue := uart.NewSerialQueue(serialPort, d.logger, handleUplinkReport)
 	d.BleController = ble.NewBLEController(serialPort, serialQueue, d.logger)
 	if err := d.BleController.InitializeAsPeripheral(); err != nil {
 		return fmt.Errorf("BLE设备初始化失败: %w", err)
@@ -99,6 +98,12 @@ func (d *Driver) Start() error {
 	// 将传感器数据转发到指定主题上
 
 	return nil
+}
+
+// 上报回调处理函数
+func handleUplinkReport(line string) {
+	fmt.Printf("收到上报数据: %s\n", line)
+	// 可以进一步解析为JSON、结构体、转发等
 }
 
 // HandleReadCommands 处理读取命令

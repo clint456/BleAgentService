@@ -69,7 +69,7 @@ func SendJSONOverUART(sq interfaces.SerialQueue, jsonData interface{}) error {
 		copy(packetData[len(Prefix)+HeaderSize:], packet.Payload)
 		copy(packetData[len(Prefix)+HeaderSize+len(packet.Payload):], Suffix)
 		// 通过串口发送
-		response, err := sq.SendCommand(packetData, time.Millisecond)
+		response, err := sq.SendCommand(packetData, time.Microsecond, 2*time.Microsecond)
 		if err != nil {
 			log.Printf("❗️ Error sending packet %d: %v", packet.Index, err)
 			continue
