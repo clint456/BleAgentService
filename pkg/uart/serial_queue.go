@@ -120,7 +120,7 @@ func (q *SerialQueue) executeRequest(req interfaces.SerialRequest) interfaces.Se
 	for {
 		select {
 		case <-timeout:
-			return interfaces.SerialResponse{"", fmt.Errorf("读取响应超时")} // 超时返回错误
+			return interfaces.SerialResponse{Data: "", Error: fmt.Errorf("读取响应超时")} // 超时返回错误
 		case line := <-q.readerCh: // 从读取通道获取一行数据
 			line = strings.TrimSpace(line) // 去除首尾空白
 			if line == "" {
