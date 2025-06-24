@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"device-ble/pkg/ble"
+	"device-ble/pkg/dataparse"
 	"device-ble/pkg/mqttbus"
 	"device-ble/pkg/uart"
 	errorDefault "errors"
@@ -36,6 +37,7 @@ import (
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
+	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 )
 
 // Driver BLE代理服务驱动程序
@@ -110,7 +112,7 @@ func (d *Driver) HandleUpAgentCallback(data string) {
 		Data:      data,
 	}
 	// 转发至MessageBus
-	err := d.MessageBusClient.Publish("edgex/service/data/device_ble", p)
+	err := d.MessageBusClient.Publish("edgex/service/data/device_ble/up", p)
 	if err != nil {
 		fmt.Printf("【透明代理上行】转发至消息总线失败 ❌: %v", err) // 记录错误日志
 	} else {
@@ -121,28 +123,69 @@ func (d *Driver) HandleUpAgentCallback(data string) {
 
 func (d *Driver) HandleUpCommandCallback(cmd string) {
 	fmt.Printf("收到控制上报命令: %s\n", cmd)
-	// 解析上报命令
+	// TODO: 解析运维系统命令并响应
+	/* 上报命令格式
+	Payload{
+		statusCode:"0",     // 状态码，默认为0，异常为非0
+		timestamp:"",           //  Unix纳秒时间戳
+		commandType:"allstatus",   // 命令类型：allstatus/monitor
+		commandParam:" ",  // 留空
+	}
+	*/
+
+	/* 解析上报命令
+	1. 检查statusCode字段
+	2. 判断commandType字段，分发allstatus、monitor协程任务
+	*/
+
+	/* allstatus任务
+	1. 订阅系统事件
+	2. 获取status字段以及设备相对应字段，json格式化，交由ai处理,整理发送数据包
+	3. ataparse.SendToBlE发送给设备作为响应
+	*/
+
+	/* monitor 协程任务
+	1. 判断上一个监听是否结束
+	2. 订阅指定设备事件
+	3. 获取响应字段，格式化，整理发送数据包
+	4. dataparse.SendToBlE发送给设备作为响应
+	*/
 
 }
 
 // Start 启动设备服务
 func (d *Driver) Start() error {
 	// 监听消息总线是否有透明代理下发命令
+	// TODO 透明代理消息数据解析
+	/* 下发数据格式：
+	payload{
+	timestamp:"",  //  Unix纳秒时间戳
+	data:""   //原始数据
+	}
+	*/
+	// 测试发送连通性
+	d.MessageBusClient.Subscribe([]string{"edgex/service/data/device_ble/dwon"}, d.agentDown)
+	return nil
+}
 
+// agentDown 该回调函数被消息总线接收协程所调用
+// 用于处理蓝牙透明代理下行数据
+func (d *Driver) agentDown(topic string, envelope types.MessageEnvelope) error {
+	dataparse.SendToBlE(d.BleController, envelope)
 	return nil
 }
 
 // HandleReadCommands 处理读取命令
 func (d *Driver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
 	d.logger.Debugf("处理设备 %s 的读取命令", deviceName)
-	// TODO: 实现具体的读取逻辑
+	// TODO: 实现UI具体的读取逻辑
 	return nil, fmt.Errorf("读取命令暂未实现")
 }
 
 // HandleWriteCommands 处理写入命令
 func (d *Driver) HandleWriteCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest, params []*dsModels.CommandValue) error {
 	d.logger.Debugf("处理设备 %s 的写入命令", deviceName)
-	// TODO: 实现具体的写入逻辑
+	// TODO: 实现UI具体的写入逻辑
 	return nil
 }
 

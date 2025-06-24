@@ -40,10 +40,10 @@ func NewEdgexMessageBusClient(cfg internalif.MQTTConfig, logger logger.LoggingCl
 
 // Subscribe 注册 handler
 func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic string, envelope types.MessageEnvelope) error) error {
+	// 装饰器：后期可以在不修改远程包的基础上自定义该函数
 	wrappedHandler := func(topic string, envelope types.MessageEnvelope) error {
 		// 加日志确认是否被调用
 		fmt.Printf("wrappedHandler被调用: topic=%s\n", topic)
-
 		return handler(topic, envelope)
 	}
 	if err := e.client.Subscribe(topics, wrappedHandler); err != nil {
