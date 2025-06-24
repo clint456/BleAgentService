@@ -29,8 +29,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("串口配置:", cfg.Serial)
-	fmt.Println("MQTT配置:", cfg.MQTT)
+	fmt.Println("自定义的串口配置:", cfg.Serial)
+	fmt.Println("自定义的MQTT客户端配置:", cfg.MQTT)
 
 	d := driverpkg.Driver{
 		Config: cfg,

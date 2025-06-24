@@ -12,12 +12,13 @@ import (
 
 // SerialQueue 串口命令队列管理器，用于管理串口命令的发送和响应处理
 type SerialQueue struct {
-	serialPort SerialPortInterface           // 串口操作接口
-	requestCh  chan interfaces.SerialRequest // 命令请求队列通道
-	callback   func(string)                  // 异步消息回调函数
-	stopCh     chan struct{}                 // 停止信号通道
-	logger     logger.LoggingClient          // 日志记录器
-	readerCh   chan string                   // 串口读取数据的通用管道
+	serialPort      SerialPortInterface           // 串口操作接口
+	requestCh       chan interfaces.SerialRequest // 命令请求队列通道
+	commandCallback func(string)                  // 异步命令消息回调函数
+	upAgentCallback func(string)                  // 异步透明代理回调函数
+	stopCh          chan struct{}                 // 停止信号通道
+	logger          logger.LoggingClient          // 日志记录器
+	readerCh        chan string                   // 串口读取数据的通用管道
 }
 
 // NewSerialQueue 创建新的串口队列管理器并启动后台处理协程
@@ -28,13 +29,14 @@ type SerialQueue struct {
 //
 // 返回:
 //   - *SerialQueue: 新创建的串口队列管理器实例
-func NewSerialQueue(port SerialPortInterface, logger logger.LoggingClient, cb func(string)) *SerialQueue {
+func NewSerialQueue(port SerialPortInterface, logger logger.LoggingClient, ccb func(string), uacb func(string)) *SerialQueue {
 	q := &SerialQueue{
-		serialPort: port,
-		requestCh:  make(chan interfaces.SerialRequest, 10), // 初始化命令请求队列，容量为10
-		stopCh:     make(chan struct{}),                     // 初始化停止信号通道
-		callback:   cb,                                      // 设置异步消息回调
-		logger:     logger,                                  // 设置日志记录器
+		serialPort:      port,
+		requestCh:       make(chan interfaces.SerialRequest, 10), // 初始化命令请求队列，容量为10
+		stopCh:          make(chan struct{}),                     // 初始化停止信号通道
+		commandCallback: ccb,                                     // 设置上报命令消息回调函数
+		upAgentCallback: uacb,                                    // 设置上行透明代理回调函数
+		logger:          logger,                                  // 设置日志记录器
 	}
 
 	go q.processRequests() // 启动后台协程，处理命令请求
@@ -131,12 +133,10 @@ func (q *SerialQueue) executeRequest(req interfaces.SerialRequest) interfaces.Se
 
 			// 判断是否为终止响应
 			if q.isTerminal(line) {
-				if strings.HasPrefix(line, "+CME ERROR:") {
-					return interfaces.SerialResponse{Data: full.String(), Error: fmt.Errorf("模块错误: %s", line)} // 模块错误
-				} else if line == "ERROR" {
+				if line == "ERROR" {
 					return interfaces.SerialResponse{Data: full.String(), Error: fmt.Errorf("命令执行失败")} // 命令失败
 				} else if line == "OK" {
-					return interfaces.SerialResponse{Data: full.String()} // 命令成功
+					return interfaces.SerialResponse{Data: full.String(), Error: nil} // 命令成功
 				}
 				return interfaces.SerialResponse{Data: full.String(), Error: fmt.Errorf("未知响应: %s", line)} // 未知响应
 			}
@@ -159,6 +159,7 @@ func (q *SerialQueue) writeCommand(cmd []byte) error {
 	return err
 }
 
+// uart -> device 持续读取串口
 // startReaderLoop 启动串口读取循环
 // 创建常驻协程，持续读取串口数据并分发到 readerCh 或回调函数
 func (q *SerialQueue) startReaderLoop() {
@@ -179,13 +180,28 @@ func (q *SerialQueue) startReaderLoop() {
 				continue // 忽略空行
 			}
 			// 忽略特定蓝牙模块的无用消息
-			if strings.HasPrefix(line, "freqchip") {
+			if strings.Contains(line, "freqchip") {
 				continue
 			}
-			// 判断是否为异步上报消息
-			if strings.HasPrefix(line, "+COMMAND:") {
-				if q.callback != nil {
-					q.callback(line) // 调用回调函数处理异步消息
+			if strings.Contains(line, "+AGENT:") {
+				lines := strings.Split(line, "+AGENT:")
+				for _, part := range lines {
+					if part == "" {
+						continue
+					}
+					if q.upAgentCallback != nil {
+						go q.upAgentCallback(part) // 异步调用回调
+					}
+				}
+			} else if strings.Contains(line, "+COMMAND:") {
+				lines := strings.Split(line, "+COMMAND:")
+				for _, part := range lines {
+					if part == "" {
+						continue
+					}
+					if q.commandCallback != nil {
+						go q.commandCallback(part) // 异步调用回调
+					}
 				}
 			} else {
 				q.readerCh <- line // 普通响应放入读取通道

@@ -3,7 +3,6 @@ package mqttbus
 import (
 	internalif "device-ble/internal/interfaces"
 	"fmt"
-	"strings"
 
 	messagebus "github.com/clint456/edgex-messagebus-client"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
@@ -54,6 +53,5 @@ func (e *EdgexMessageBusClient) Subscribe(topics []string, handler func(topic st
 }
 
 func (e *EdgexMessageBusClient) Publish(topic string, data interface{}) error {
-	transmitTopic := strings.Replace(topic, "edgex", "", -1)
-	return e.client.Publish("edgex/service/data"+transmitTopic, data)
+	return e.client.Publish(topic, data)
 }

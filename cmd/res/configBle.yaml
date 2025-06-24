@@ -1,7 +1,7 @@
 serial:
   portName: "/dev/ttyS3"
   baudRate: 115200
-  readTimeout: 100
+  readTimeout: 10
 
 mqtt:
   host: "192.168.8.196"

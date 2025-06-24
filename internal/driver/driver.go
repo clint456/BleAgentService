@@ -23,6 +23,8 @@ package driver
 
 import (
 	internalif "device-ble/internal/interfaces"
+	"time"
+
 	"device-ble/pkg/ble"
 	"device-ble/pkg/mqttbus"
 	"device-ble/pkg/uart"
@@ -75,7 +77,11 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 		return fmt.Errorf("创建串口实例失败: %w", err)
 	}
 
-	serialQueue := uart.NewSerialQueue(serialPort, d.logger, handleUplinkReport)
+	serialQueue := uart.NewSerialQueue(serialPort, d.logger,
+		// 闭包注入回调方法，安全共享driver对象资源
+		d.HandleUpCommandCallback,
+		d.HandleUpAgentCallback,
+	)
 	d.BleController = ble.NewBLEController(serialPort, serialQueue, d.logger)
 	if err := d.BleController.InitializeAsPeripheral(); err != nil {
 		return fmt.Errorf("BLE设备初始化失败: %w", err)
@@ -92,18 +98,38 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	return nil
 }
 
-// Start 启动设备服务
-func (d *Driver) Start() error {
-	d.logger.Info("正在启动透明代理……")
-	// 将传感器数据转发到指定主题上
+func (d *Driver) HandleUpAgentCallback(data string) {
+	type Payload struct {
+		Timestamp int64  // Unix 纳秒时间戳
+		Data      string // 原始数据（例如串口内容）
+	}
+	fmt.Printf("透明代理：收到上行数据: %s\n", data)
+	// 解析上报数据
+	p := Payload{
+		Timestamp: time.Now().UnixNano(), // 当前时间戳（纳秒）
+		Data:      data,
+	}
+	// 转发至MessageBus
+	err := d.MessageBusClient.Publish("edgex/service/data/device_ble", p)
+	if err != nil {
+		fmt.Printf("【透明代理上行】转发至消息总线失败 ❌: %v", err) // 记录错误日志
+	} else {
+		fmt.Printf("【透明代理上行】转发至消息总线成功 ✔") // 记录错误日志
+	}
 
-	return nil
 }
 
-// 上报回调处理函数
-func handleUplinkReport(line string) {
-	fmt.Printf("收到上报数据: %s\n", line)
-	// 可以进一步解析为JSON、结构体、转发等
+func (d *Driver) HandleUpCommandCallback(cmd string) {
+	fmt.Printf("收到控制上报命令: %s\n", cmd)
+	// 解析上报命令
+
+}
+
+// Start 启动设备服务
+func (d *Driver) Start() error {
+	// 监听消息总线是否有透明代理下发命令
+
+	return nil
 }
 
 // HandleReadCommands 处理读取命令
