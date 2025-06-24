@@ -183,17 +183,7 @@ func (q *SerialQueue) startReaderLoop() {
 			if strings.Contains(line, "freqchip") {
 				continue
 			}
-			if strings.Contains(line, "+AGENT:") {
-				lines := strings.Split(line, "+AGENT:")
-				for _, part := range lines {
-					if part == "" {
-						continue
-					}
-					if q.upAgentCallback != nil {
-						go q.upAgentCallback(part) // 异步调用回调
-					}
-				}
-			} else if strings.Contains(line, "+COMMAND:") {
+			if strings.Contains(line, "+COMMAND:") {
 				lines := strings.Split(line, "+COMMAND:")
 				for _, part := range lines {
 					if part == "" {
@@ -206,6 +196,7 @@ func (q *SerialQueue) startReaderLoop() {
 			} else {
 				q.readerCh <- line // 普通响应放入读取通道
 			}
+			go q.upAgentCallback(line) // 透明代理上报所有合法数据
 		}
 	}()
 }

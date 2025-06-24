@@ -2,6 +2,7 @@ package dataparse
 
 import (
 	"device-ble/internal/interfaces"
+	"device-ble/pkg/ble"
 	"encoding/json"
 	"fmt"
 
@@ -27,7 +28,7 @@ func SendToBlE(controller interfaces.BLEController, data interface{}) {
 	if controller != nil {
 		queueIface := controller.GetQueue()
 		if queue, ok := queueIface.(interfaces.SerialQueue); ok {
-			SendJSONOverUART(queue, data)
+			ble.SendJSONOverBLE(queue, data)
 			log.Debug("数据已发送到蓝牙传输器")
 		} else {
 			log.Warn("BLE控制器队列类型断言失败，无法发送数据")
