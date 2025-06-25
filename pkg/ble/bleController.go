@@ -3,22 +3,20 @@ package ble
 import (
 	"device-ble/internal/interfaces"
 	"device-ble/pkg/uart"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 )
 
-// BLEController 蓝牙低功耗控制器
-// 职责：管理BLE设备的初始化、命令发送和状态控制
+// BLEController 蓝牙低功耗控制器，管理BLE设备的初始化、命令发送和状态控制。
 type BLEController struct {
 	Port   *uart.SerialPort
 	Queue  interfaces.SerialQueue
 	logger logger.LoggingClient
 }
 
-// NewBLEController 创建新的BLE控制器
+// NewBLEController 创建新的BLE控制器。
 func NewBLEController(port *uart.SerialPort, queue interfaces.SerialQueue, logger logger.LoggingClient) *BLEController {
 	return &BLEController{
 		Port:   port,
@@ -27,7 +25,7 @@ func NewBLEController(port *uart.SerialPort, queue interfaces.SerialQueue, logge
 	}
 }
 
-// InitializeAsPeripheral 初始化BLE设备为外围设备模式
+// InitializeAsPeripheral 初始化BLE设备为外围设备模式。
 func (c *BLEController) InitializeAsPeripheral() error {
 	initCommands := []BLECommand{
 		CommandReset,
@@ -40,14 +38,15 @@ func (c *BLEController) InitializeAsPeripheral() error {
 		CommandStartAdvertising,
 	}
 	for _, cmd := range initCommands {
-		// 通过串口发送
 		response, err := c.Queue.SendCommand([]byte(cmd), 2*time.Second, 1*time.Second)
 		if strings.Contains(response, "OK") {
-			log.Printf("✅ 发送 %q 成功, 回显： %v \n", cmd, response)
+			c.logger.Infof("✅ 发送 %q 成功, 回显： %v", cmd, response)
 		} else if strings.Contains(response, "ERROR") {
-			log.Printf("⛔️  发送 %q 失败, 回显： %v \n", cmd, response)
+			c.logger.Errorf("⛔️  发送 %q 失败, 回显： %v", cmd, response)
+		} else if err != nil {
+			c.logger.Errorf("❗❓未知回显 :%v, response:%v", err, response)
 		} else {
-			log.Printf("❗❓未知回显 :%s, response:%v \n", err, response)
+			c.logger.Warnf("❗❓未知回显, response:%v", response)
 		}
 	}
 

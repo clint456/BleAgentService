@@ -10,7 +10,7 @@ import (
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 )
 
-// SerialQueue 串口命令队列管理器，用于管理串口命令的发送和响应处理
+// SerialQueue 串口命令队列管理器，用于管理串口命令的发送和响应处理。
 type SerialQueue struct {
 	serialPort      SerialPortInterface           // 串口操作接口
 	requestCh       chan interfaces.SerialRequest // 命令请求队列通道
@@ -21,14 +21,7 @@ type SerialQueue struct {
 	readerCh        chan string                   // 串口读取数据的通用管道
 }
 
-// NewSerialQueue 创建新的串口队列管理器并启动后台处理协程
-// 参数:
-//   - port: 串口操作接口，用于实际的串口读写
-//   - logger: 日志记录器，用于记录操作日志
-//   - cb: 异步消息回调函数，处理特定类型的串口响应
-//
-// 返回:
-//   - *SerialQueue: 新创建的串口队列管理器实例
+// NewSerialQueue 创建新的串口队列管理器并启动后台处理协程。
 func NewSerialQueue(port SerialPortInterface, logger logger.LoggingClient, ccb func(string), uacb func(string)) *SerialQueue {
 	q := &SerialQueue{
 		serialPort:      port,
@@ -46,41 +39,28 @@ func NewSerialQueue(port SerialPortInterface, logger logger.LoggingClient, ccb f
 	return q
 }
 
-// SendCommand 发送串口命令并等待响应
-// 参数:
-//   - command: 要发送的命令字节数组
-//   - timeout: 等待响应的超时时间
-//   - delay: 发送命令后等待读取的延迟时间
-//
-// 返回:
-//   - string: 串口响应数据
-//   - error: 执行过程中的错误（如果有）
+// SendCommand 发送串口命令并等待响应。
 func (q *SerialQueue) SendCommand(command []byte, timeout, ReadDelay time.Duration) (string, error) {
 	if len(command) == 0 {
-		return "", fmt.Errorf("命令不能为空") // 校验命令非空
+		return "", fmt.Errorf("命令不能为空")
 	}
-
-	responseCh := make(chan interfaces.SerialResponse, 1) // 创建响应通道
+	responseCh := make(chan interfaces.SerialResponse, 1)
 	req := interfaces.SerialRequest{
-		Command:         command,    // 命令内容
-		Timeout:         timeout,    // 超时时间
-		DelayBeforeRead: ReadDelay,  // 读取前的延迟
-		ResponseCh:      responseCh, // 响应通道
+		Command:         command,
+		Timeout:         timeout,
+		DelayBeforeRead: ReadDelay,
+		ResponseCh:      responseCh,
 	}
-
-	// 将请求发送到命令队列
 	select {
 	case q.requestCh <- req:
 	case <-time.After(5 * time.Second):
-		return "", fmt.Errorf("请求队列已满") // 队列满时返回错误
+		return "", fmt.Errorf("请求队列已满")
 	}
-
-	// 等待命令响应或超时
 	select {
 	case resp := <-responseCh:
-		return resp.Data, resp.Error // 返回响应数据和错误
+		return resp.Data, resp.Error
 	case <-time.After(req.DelayBeforeRead + req.Timeout + time.Second):
-		return "", fmt.Errorf("等待响应超时") // 超时返回错误
+		return "", fmt.Errorf("等待响应超时")
 	}
 }
 
@@ -212,9 +192,8 @@ func (q *SerialQueue) isTerminal(line string) bool {
 	return strings.Contains(line, "OK") || strings.Contains(line, "ERROR")
 }
 
-// Close 关闭串口队列管理器
-// 停止后台协程并清理资源
+// Close 关闭串口队列管理器，停止后台协程并清理资源。
 func (q *SerialQueue) Close() {
-	close(q.stopCh)          // 发送停止信号
-	q.logger.Info("串口队列已关闭") // 记录关闭日志
+	close(q.stopCh)
+	q.logger.Info("串口队列已关闭")
 }

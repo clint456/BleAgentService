@@ -7,9 +7,8 @@ import (
 	"fmt"
 )
 
-// PublishToMessageBus 发布数据到MessageBus
+// PublishToMessageBus 发布数据到MessageBus。
 func PublishToMessageBus(client interfaces.MessageBusClient, data interface{}, topic string) error {
-	// 数据类型断言
 	dataBytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("序列化数据失败: %v", err)
@@ -21,14 +20,13 @@ func PublishToMessageBus(client interfaces.MessageBusClient, data interface{}, t
 	return nil
 }
 
-// SendToBlE 异步传输到蓝牙发送器
+// SendToBlE 异步传输到蓝牙发送器。
 func SendToBlE(controller interfaces.BLEController, data interface{}) error {
 	if controller != nil {
 		queueIface := controller.GetQueue()
 		if queue, ok := queueIface.(interfaces.SerialQueue); ok {
 			if err := ble.SendJSONOverBLE(queue, data); err == nil {
 				return nil
-
 			} else {
 				return fmt.Errorf("向BLE控制器发送数据失败")
 			}

@@ -4,7 +4,7 @@ import (
 	"device-ble/internal/interfaces"
 	"encoding/binary"
 	"encoding/json"
-	"log"
+	"fmt"
 	"strings"
 	"time"
 
@@ -48,45 +48,37 @@ func splitIntoPackets(data []byte) []Packet {
 	return packets
 }
 
-// SendJSONOverBLE 发送 JSON 数据的主要函数
+// SendJSONOverBLE 发送 JSON 数据的主要函数。
 func SendJSONOverBLE(sq interfaces.SerialQueue, jsonData interface{}) error {
+	// 这里需要传入logger参数，建议后续重构接口
+	// 目前先用fmt.Println模拟日志，后续可传入logger
 	tag := uuid.New().String()
-	// 将 JSON 数据序列化为字节
-
 	dataBytes, err := json.Marshal(jsonData)
 	if err != nil {
-		log.Fatalf("Error marshaling JSON: %v", err)
+		return fmt.Errorf("JSON序列化失败: %v", err)
 	}
-	// 分包
 	packets := splitIntoPackets(dataBytes)
-
-	// 发送分包并验证回显
 	for _, packet := range packets {
-		// 构造分包数据：前缀 + 头部（索引 + 总包数） + 载荷 + 后缀
 		packetData := make([]byte, len(Prefix)+HeaderSize+len(packet.Payload)+len(Suffix))
 		copy(packetData, Prefix)
-		binary.BigEndian.PutUint16(packetData[len(Prefix):], packet.Index)   // 2 字节索引
-		binary.BigEndian.PutUint16(packetData[len(Prefix)+2:], packet.Total) // 2 字节总包数
+		binary.BigEndian.PutUint16(packetData[len(Prefix):], packet.Index)
+		binary.BigEndian.PutUint16(packetData[len(Prefix)+2:], packet.Total)
 		copy(packetData[len(Prefix)+HeaderSize:], packet.Payload)
 		copy(packetData[len(Prefix)+HeaderSize+len(packet.Payload):], Suffix)
-		// 通过串口发送
 		response, err := sq.SendCommand(packetData, 300*time.Microsecond, 1*time.Microsecond)
 		if err != nil {
-			log.Printf("❗️ Error sending packet %d: %v", packet.Index, err)
+			fmt.Printf("❗️ Error sending packet %d: %v\n", packet.Index, err)
 			continue
 		}
 		if strings.Contains(response, "OK") {
-			log.Printf("⚡ 数据包 %v 的子包发送 %v 成功", tag, packet.Index)
+			fmt.Printf("⚡ 数据包 %v 的子包发送 %v 成功\n", tag, packet.Index)
 		}
 		if strings.Contains(response, "ERROR") {
-			log.Printf("⛔️  数据包 %v 的发送子包 %v 失败", tag, packet.Index)
+			fmt.Printf("⛔️  数据包 %v 的发送子包 %v 失败\n", tag, packet.Index)
 		}
-		log.Printf("⬇️  Sent packet %d/%d, size: %d bytes\n", packet.Index+1, packet.Total, len(packetData))
-
-		// 模拟蓝牙模块的发送间隔（根据实际模块调整）
+		fmt.Printf("⬇️  Sent packet %d/%d, size: %d bytes\n", packet.Index+1, packet.Total, len(packetData))
 		time.Sleep(1 * time.Millisecond)
 	}
-
-	log.Printf("✅️ All packets of Packet %v sent and verified.", tag)
+	fmt.Printf("✅️ All packets of Packet %v sent and verified.\n", tag)
 	return nil
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Client 表示一个简化版的 EdgeX MessageBus 客户端，支持基本的发布、订阅和基于 RequestID 的请求-响应机制
+// Client 表示一个简化版的 EdgeX MessageBus 客户端，支持基本的发布、订阅和基于 RequestID 的请求-响应机制。
 type Client struct {
 	client        messaging.MessageClient    // 底层消息客户端
 	lc            logger.LoggingClient       // 日志客户端
@@ -43,7 +43,7 @@ type Config struct {
 // MessageHandler 定义处理订阅消息的回调函数签名
 type MessageHandler func(topic string, message types.MessageEnvelope) error
 
-// NewClient 创建一个新的 MessageBus 客户端实例
+// NewClient 创建一个新的 MessageBus 客户端实例。
 func NewClient(config Config, lc logger.LoggingClient) (*Client, error) {
 	messageBusConfig := types.MessageBusConfig{
 		Broker: types.HostInfo{
@@ -81,12 +81,12 @@ func NewClient(config Config, lc logger.LoggingClient) (*Client, error) {
 	}, nil
 }
 
-// SetTimeout 设置默认请求响应超时时间
+// SetTimeout 设置默认请求响应超时时间。
 func (c *Client) SetTimeout(timeout time.Duration) {
 	c.timeout = timeout
 }
 
-// Connect 建立与消息总线的连接
+// Connect 建立与消息总线的连接。
 func (c *Client) Connect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -100,7 +100,7 @@ func (c *Client) Connect() error {
 	return nil
 }
 
-// Disconnect 断开连接并停止所有订阅处理器
+// Disconnect 断开连接并停止所有订阅处理器。
 func (c *Client) Disconnect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -116,14 +116,14 @@ func (c *Client) Disconnect() error {
 	return nil
 }
 
-// IsConnected 返回当前连接状态
+// IsConnected 返回当前连接状态。
 func (c *Client) IsConnected() bool {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return c.isConnected
 }
 
-// Publish 直接向指定主题发布消息（不带响应能力）
+// Publish 直接向指定主题发布消息（不带响应能力）。
 func (c *Client) Publish(topic string, data interface{}) error {
 	if !c.IsConnected() {
 		return fmt.Errorf("MessageBus 未连接")
@@ -138,7 +138,7 @@ func (c *Client) Publish(topic string, data interface{}) error {
 	return c.client.Publish(message, topic)
 }
 
-// Request 发送带 RequestID 的请求并等待响应，适用于 RPC 风格通信
+// Request 发送带 RequestID 的请求并等待响应，适用于 RPC 风格通信。
 func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope, error) {
 	if !c.IsConnected() {
 		return types.MessageEnvelope{}, fmt.Errorf("MessageBus 未连接")
@@ -169,7 +169,7 @@ func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope,
 	}
 }
 
-// Subscribe 订阅普通主题并提供消息处理函数
+// Subscribe 订阅普通主题并提供消息处理函数。
 func (c *Client) Subscribe(topic string, handler MessageHandler) error {
 	if !c.IsConnected() {
 		return fmt.Errorf("MessageBus 未连接")
@@ -186,7 +186,7 @@ func (c *Client) Subscribe(topic string, handler MessageHandler) error {
 	return nil
 }
 
-// SubscribeResponse 订阅响应主题，自动将响应分发到对应请求通道
+// SubscribeResponse 订阅响应主题，自动将响应分发到对应请求通道。
 func (c *Client) SubscribeResponse(topic string) error {
 	if !c.IsConnected() {
 		return fmt.Errorf("MessageBus 未连接")
@@ -203,7 +203,7 @@ func (c *Client) SubscribeResponse(topic string) error {
 	return nil
 }
 
-// handleMessages 是普通订阅主题的处理逻辑
+// handleMessages 是普通订阅主题的处理逻辑。
 func (c *Client) handleMessages(topic string, ch chan types.MessageEnvelope, handler MessageHandler) {
 	defer c.wg.Done()
 	for {
@@ -226,7 +226,7 @@ func (c *Client) handleMessages(topic string, ch chan types.MessageEnvelope, han
 	}
 }
 
-// handleResponseMessages 专门处理响应类型消息，根据 RequestID 分发到等待通道
+// handleResponseMessages 专门处理响应类型消息，根据 RequestID 分发到等待通道。
 func (c *Client) handleResponseMessages(topic string, ch chan types.MessageEnvelope) {
 	defer c.wg.Done()
 	for {

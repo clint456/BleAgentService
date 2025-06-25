@@ -13,7 +13,7 @@ import (
 	"github.com/tarm/serial"
 )
 
-// SerialPort 串口操作结构体，封装了串口连接及相关操作
+// SerialPort 串口操作结构体，封装了串口连接及相关操作。
 type SerialPort struct {
 	port   *serial.Port         // 底层串口连接
 	reader *bufio.Reader        // 带缓冲的读取器，用于读取串口数据
@@ -21,7 +21,7 @@ type SerialPort struct {
 	logger logger.LoggingClient // 日志记录器，用于记录操作日志
 }
 
-// NewSerialPort 创建并初始化串口实例
+// NewSerialPort 创建并初始化串口实例。
 // 参数:
 //   - cfg: 串口配置，包含端口名称、波特率、读取超时等信息
 //   - logger: 日志记录器，用于记录串口操作日志
@@ -55,7 +55,7 @@ func NewSerialPort(cfg interfaces.SerialConfig, logger logger.LoggingClient) (*S
 	return sp, nil
 }
 
-// Write 向串口写入数据，线程安全
+// Write 向串口写入数据，线程安全。
 // 参数:
 //   - data: 要写入的字节数组
 //
@@ -77,7 +77,7 @@ func (sp *SerialPort) Write(data []byte) (int, error) {
 	return n, nil
 }
 
-// ReadLine 从串口读取一行数据，线程安全
+// ReadLine 从串口读取一行数据，线程安全。
 // 返回:
 //   - string: 读取的一行数据（去除换行符和回车符）
 //   - error: 读取过程中的错误（如果有）
@@ -95,7 +95,7 @@ func (sp *SerialPort) ReadLine() (string, error) {
 	return strings.TrimRight(string(line), "\r\n"), nil
 }
 
-// Close 关闭串口连接
+// Close 关闭串口连接，释放资源。
 // 返回:
 //   - error: 关闭过程中的错误（如果有）
 func (sp *SerialPort) Close() error {
