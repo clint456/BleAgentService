@@ -14,7 +14,7 @@ github.com/asaskevich/govalidator
 # github.com/cenkalti/backoff/v4 v4.3.0
 ## explicit; go 1.18
 github.com/cenkalti/backoff/v4
-# github.com/clint456/edgex-messagebus-client v1.1.0
+# github.com/clint456/edgex-messagebus-client v1.1.2
 ## explicit; go 1.23
 github.com/clint456/edgex-messagebus-client
 # github.com/eclipse/paho.mqtt.golang v1.5.0

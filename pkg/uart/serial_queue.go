@@ -196,7 +196,10 @@ func (q *SerialQueue) startReaderLoop() {
 			} else {
 				q.readerCh <- line // 普通响应放入读取通道
 			}
-			go q.upAgentCallback(line) // 透明代理上报所有合法数据
+			agent := strings.Clone(line)
+			if q.upAgentCallback != nil {
+				go q.upAgentCallback(agent) // ✅ 修复 panic 风险
+			}
 		}
 	}()
 }

@@ -97,10 +97,23 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	}
 
 	d.logger.Info("BLE代理服务初始化完成")
+	// 监听消息总线是否有透明代理下发命令
+	// TODO 透明代理消息数据解析
+	/* 下发数据格式：
+	payload{
+	timestamp:"",  //  Unix纳秒时间戳
+	data:""   //原始数据
+	}
+	*/
+	// 测试发送连通性
+	d.MessageBusClient.Subscribe([]string{"edgex/service/data/device_ble/dwon"}, d.agentDown)
 	return nil
 }
 
 func (d *Driver) HandleUpAgentCallback(data string) {
+	if data == "" {
+		return
+	}
 	type Payload struct {
 		Timestamp int64  // Unix 纳秒时间戳
 		Data      string // 原始数据（例如串口内容）
@@ -112,13 +125,15 @@ func (d *Driver) HandleUpAgentCallback(data string) {
 		Data:      data,
 	}
 	// 转发至MessageBus
-	err := d.MessageBusClient.Publish("edgex/service/data/device_ble/up", p)
-	if err != nil {
-		fmt.Printf("【透明代理上行】转发至消息总线失败 ❌: %v", err) // 记录错误日志
-	} else {
-		fmt.Printf("【透明代理上行】转发至消息总线成功 ✔") // 记录错误日志
+	if d.MessageBusClient != nil {
+		err := d.MessageBusClient.Publish("edgex/service/data/device_ble/up", p)
+		if err != nil {
+			fmt.Printf("【透明代理上行】转发至消息总线失败 ❌: %v \n", err) // 记录错误日志
+		} else {
+			fmt.Printf("【透明代理上行】转发至消息总线成功 ✔ \n") // 记录错误日志
+		}
 	}
-
+	return
 }
 
 func (d *Driver) HandleUpCommandCallback(cmd string) {
@@ -155,16 +170,7 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 
 // Start 启动设备服务
 func (d *Driver) Start() error {
-	// 监听消息总线是否有透明代理下发命令
-	// TODO 透明代理消息数据解析
-	/* 下发数据格式：
-	payload{
-	timestamp:"",  //  Unix纳秒时间戳
-	data:""   //原始数据
-	}
-	*/
-	// 测试发送连通性
-	d.MessageBusClient.Subscribe([]string{"edgex/service/data/device_ble/dwon"}, d.agentDown)
+
 	return nil
 }
 

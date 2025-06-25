@@ -3,7 +3,7 @@ module device-ble
 go 1.24.3
 
 require (
-	github.com/clint456/edgex-messagebus-client v1.1.0
+	github.com/clint456/edgex-messagebus-client v1.1.2
 	github.com/edgexfoundry/device-sdk-go/v4 v4.0.0
 	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.0.3
 	github.com/edgexfoundry/go-mod-core-contracts/v4 v4.0.1
@@ -11,6 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/labstack/gommon v0.4.2
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -121,6 +122,5 @@ require (
 	google.golang.org/grpc v1.70.0 // indirect
 	google.golang.org/protobuf v1.36.3 // indirect
 	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	nhooyr.io/websocket v1.8.17 // indirect
 )
