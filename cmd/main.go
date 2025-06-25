@@ -59,6 +59,11 @@ func main() {
 	// 6. 初始化BLE控制器
 	bleController := ble.NewBLEController(serialPort, serialQueue, lc)
 
+	// 6.1 初始化BLE设备为外围设备模式
+	if err := bleController.InitializeAsPeripheral(); err != nil {
+		log.Fatal("BLE设备初始化失败:", err)
+	}
+
 	// 7. 初始化消息总线
 	mqttClient, err := mqttbus.NewEdgexMessageBusClient(cfg.MQTT, lc)
 	if err != nil {
