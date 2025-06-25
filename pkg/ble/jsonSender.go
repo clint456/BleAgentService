@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -69,15 +70,15 @@ func SendJSONOverBLE(sq interfaces.SerialQueue, jsonData interface{}) error {
 		copy(packetData[len(Prefix)+HeaderSize:], packet.Payload)
 		copy(packetData[len(Prefix)+HeaderSize+len(packet.Payload):], Suffix)
 		// 通过串口发送
-		response, err := sq.SendCommand(packetData, time.Microsecond, 2*time.Microsecond)
+		response, err := sq.SendCommand(packetData, 300*time.Microsecond, 1*time.Microsecond)
 		if err != nil {
 			log.Printf("❗️ Error sending packet %d: %v", packet.Index, err)
 			continue
 		}
-		if response == "OK\n" {
+		if strings.Contains(response, "OK") {
 			log.Printf("⚡ 数据包 %v 的子包发送 %v 成功", tag, packet.Index)
 		}
-		if response == "ERROR\n" {
+		if strings.Contains(response, "ERROR") {
 			log.Printf("⛔️  数据包 %v 的发送子包 %v 失败", tag, packet.Index)
 		}
 		log.Printf("⬇️  Sent packet %d/%d, size: %d bytes\n", packet.Index+1, packet.Total, len(packetData))

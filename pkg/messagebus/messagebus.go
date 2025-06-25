@@ -129,10 +129,11 @@ func (c *Client) Publish(topic string, data interface{}) error {
 		return fmt.Errorf("MessageBus 未连接")
 	}
 	message := types.MessageEnvelope{
-		Versionable: commonDTO.NewVersionable(),
-		RequestID:   uuid.NewString(),
-		Payload:     data,
-		ContentType: "application/json",
+		Versionable:   commonDTO.NewVersionable(),
+		RequestID:     uuid.NewString(),
+		CorrelationID: uuid.NewString(),
+		Payload:       data,
+		ContentType:   "application/json",
 	}
 	return c.client.Publish(message, topic)
 }
@@ -149,10 +150,11 @@ func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope,
 	defer c.responseChMap.Delete(reqID)
 
 	message := types.MessageEnvelope{
-		Versionable: commonDTO.NewVersionable(),
-		RequestID:   reqID,
-		Payload:     data,
-		ContentType: "application/json",
+		Versionable:   commonDTO.NewVersionable(),
+		RequestID:     reqID,
+		CorrelationID: uuid.NewString(),
+		Payload:       data,
+		ContentType:   "application/json",
 	}
 
 	if err := c.client.Publish(message, topic); err != nil {

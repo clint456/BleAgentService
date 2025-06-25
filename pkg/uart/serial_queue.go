@@ -55,7 +55,7 @@ func NewSerialQueue(port SerialPortInterface, logger logger.LoggingClient, ccb f
 // 返回:
 //   - string: 串口响应数据
 //   - error: 执行过程中的错误（如果有）
-func (q *SerialQueue) SendCommand(command []byte, timeout, delay time.Duration) (string, error) {
+func (q *SerialQueue) SendCommand(command []byte, timeout, ReadDelay time.Duration) (string, error) {
 	if len(command) == 0 {
 		return "", fmt.Errorf("命令不能为空") // 校验命令非空
 	}
@@ -64,7 +64,7 @@ func (q *SerialQueue) SendCommand(command []byte, timeout, delay time.Duration) 
 	req := interfaces.SerialRequest{
 		Command:         command,    // 命令内容
 		Timeout:         timeout,    // 超时时间
-		DelayBeforeRead: delay,      // 读取前的延迟
+		DelayBeforeRead: ReadDelay,  // 读取前的延迟
 		ResponseCh:      responseCh, // 响应通道
 	}
 
@@ -79,7 +79,7 @@ func (q *SerialQueue) SendCommand(command []byte, timeout, delay time.Duration) 
 	select {
 	case resp := <-responseCh:
 		return resp.Data, resp.Error // 返回响应数据和错误
-	case <-time.After(timeout + delay + time.Second):
+	case <-time.After(req.DelayBeforeRead + req.Timeout + time.Second):
 		return "", fmt.Errorf("等待响应超时") // 超时返回错误
 	}
 }
@@ -128,15 +128,13 @@ func (q *SerialQueue) executeRequest(req interfaces.SerialRequest) interfaces.Se
 			if line == "" {
 				continue // 忽略空行
 			}
-			q.logger.Debugf("响应: %s", line) // 记录调试日志
-			full.WriteString(line + "\n")   // 累积响应数据
-
+			// log.Printf("executeRequest接收到：%v\n", line)
 			// 判断是否为终止响应
 			if q.isTerminal(line) {
-				if line == "ERROR" {
-					return interfaces.SerialResponse{Data: full.String(), Error: fmt.Errorf("命令执行失败")} // 命令失败
-				} else if line == "OK" {
-					return interfaces.SerialResponse{Data: full.String(), Error: nil} // 命令成功
+				if strings.Contains(line, "ERROR") {
+					return interfaces.SerialResponse{Data: line, Error: fmt.Errorf("命令执行失败")} // 命令失败
+				} else if strings.Contains(line, "OK") {
+					return interfaces.SerialResponse{Data: line, Error: nil} // 命令成功
 				}
 				return interfaces.SerialResponse{Data: full.String(), Error: fmt.Errorf("未知响应: %s", line)} // 未知响应
 			}
@@ -169,13 +167,13 @@ func (q *SerialQueue) startReaderLoop() {
 			line, err := q.serialPort.ReadLine() // 读取一行串口数据
 			if err != nil {
 				if err == io.EOF { // 遇到EOF，短暂休眠后继续
-					time.Sleep(10 * time.Millisecond)
+					time.Sleep(1 * time.Millisecond)
 					continue
 				}
 				q.logger.Errorf("串口读取错误: %v", err) // 记录读取错误
 				continue
 			}
-			line = strings.TrimSpace(line) // 去除首尾空白
+			line = strings.Trim(line, "\r\n") //去除首位换行制表符
 			if line == "" {
 				continue // 忽略空行
 			}
@@ -211,7 +209,7 @@ func (q *SerialQueue) startReaderLoop() {
 // 返回:
 //   - bool: 是否为终止响应
 func (q *SerialQueue) isTerminal(line string) bool {
-	return line == "OK" || line == "ERROR" || strings.HasPrefix(line, "+CME ERROR:")
+	return strings.Contains(line, "OK") || strings.Contains(line, "ERROR")
 }
 
 // Close 关闭串口队列管理器

@@ -4,6 +4,7 @@ import (
 	"device-ble/internal/interfaces"
 	"device-ble/pkg/uart"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
@@ -40,13 +41,13 @@ func (c *BLEController) InitializeAsPeripheral() error {
 	}
 	for _, cmd := range initCommands {
 		// 通过串口发送
-		response, err := c.Queue.SendCommand([]byte(cmd), time.Second, 2*time.Second)
-		if response == "OK\n" {
-			log.Printf("✅ 发送 %v 成功, 回显： %v\n", cmd, response)
-		} else if response == "ERROR\n" {
-			log.Printf("⛔️  发送 %v 失败, 回显： %v\n", cmd, response)
+		response, err := c.Queue.SendCommand([]byte(cmd), 2*time.Second, 1*time.Second)
+		if strings.Contains(response, "OK") {
+			log.Printf("✅ 发送 %q 成功, 回显： %v \n", cmd, response)
+		} else if strings.Contains(response, "ERROR") {
+			log.Printf("⛔️  发送 %q 失败, 回显： %v \n", cmd, response)
 		} else {
-			log.Printf("❗❓未知回显 :%s, response:%v\n", err, response)
+			log.Printf("❗❓未知回显 :%s, response:%v \n", err, response)
 		}
 	}
 

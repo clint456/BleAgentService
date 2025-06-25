@@ -4,6 +4,7 @@ import (
 	internalif "device-ble/internal/interfaces"
 	"device-ble/pkg/messagebus"
 	"fmt"
+	"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
@@ -62,4 +63,8 @@ func (e *EdgexMessageBusClient) SubscribeResponse(topic string) error {
 
 func (e *EdgexMessageBusClient) Request(topic string, data interface{}) (types.MessageEnvelope, error) {
 	return e.client.Request(topic, data)
+}
+
+func (e *EdgexMessageBusClient) SetTimeout(timeout time.Duration) {
+	e.client.SetTimeout(timeout)
 }

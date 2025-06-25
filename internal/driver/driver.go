@@ -24,6 +24,7 @@ package driver
 import (
 	internalif "device-ble/internal/interfaces"
 	"log"
+	"strings"
 	"time"
 
 	"device-ble/pkg/ble"
@@ -119,7 +120,7 @@ func (d *Driver) HandleUpAgentCallback(data string) {
 		Timestamp int64  // Unix 纳秒时间戳
 		Data      string // 原始数据（例如串口内容）
 	}
-	fmt.Printf("透明代理：收到上行数据: %s\n", data)
+	fmt.Printf("【透明代理（↑）】：收到上行数据: %s\n", data)
 	// 解析上报数据
 	p := Payload{
 		Timestamp: time.Now().UnixNano(), // 当前时间戳（纳秒）
@@ -129,16 +130,15 @@ func (d *Driver) HandleUpAgentCallback(data string) {
 	if d.MessageBusClient != nil {
 		err := d.MessageBusClient.Publish("edgex/service/data/device_ble/up", p)
 		if err != nil {
-			fmt.Printf("【透明代理上行】转发至消息总线失败 ❌: %v \n", err) // 记录错误日志
+			fmt.Printf("【透明代理（↑）】转发至消息总线失败 ❌: %v \n", err) // 记录错误日志
 		} else {
-			fmt.Printf("【透明代理上行】转发至消息总线成功 ✔ \n") // 记录错误日志
+			fmt.Printf("【透明代理（↑）】转发至消息总线成功 ✔ \n") // 记录错误日志
 		}
 	}
 	return
 }
 
 func (d *Driver) HandleUpCommandCallback(cmd string) {
-	fmt.Printf("收到控制上报命令: %s\n", cmd)
 	// TODO: 解析运维系统命令并响应
 	/* 上报命令格式
 	Payload{
@@ -167,23 +167,33 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 	4. dataparse.SendToBlE发送给设备作为响应
 	*/
 
-	switch cmd {
-	case "allstatus":
-		fmt.Printf("【运维】开始查询所有设备状态")
-		err := d.MessageBusClient.SubscribeResponse("edgex/response/core-command/#")
+	if strings.Contains(cmd, "allstatus") {
+		fmt.Printf("【运维——allstatus】开始查询所有设备状态")
+		err := d.MessageBusClient.SubscribeResponse("edgex/response/#")
 		if err != nil {
 			log.Fatalf("订阅响应失败: %v", err)
 		}
+		fmt.Printf("【运维——allstatus】订阅响应成功")
 		// 发送请求
-		payload := ""
-		resp, err := d.MessageBusClient.Request("edgex/core/commandquery/request/all", payload)
+		d.MessageBusClient.SetTimeout(10 * time.Second)
+		resp, err := d.MessageBusClient.Request("edgex/core/commandquery/request/all", "")
 		if err != nil {
-			log.Fatalf("请求失败: %v", err)
+			log.Fatalf("【运维——allstatus】请求失败: %v", err)
 		}
-		fmt.Printf("请求系统响应： %v", resp)
 
-	case "status":
+		fmt.Printf("【运维——allstatus】 请求系统响应:\n")
+		data, err := dataparse.ExtractProfileAndResources(&resp)
+		if err != nil {
+			log.Fatalf("【运维——allstatus】数据解析失败: %v\n", err)
+		}
 
+		err = ble.SendJSONOverBLE(d.BleController.GetQueue(), data)
+		if err != nil {
+			log.Fatalf("【运维——allstatus】发送响应失败: %v\n", err)
+		}
+
+	} else if strings.Contains(cmd, "status") {
+		fmt.Printf("【运维——status】发起status请求: %v", cmd)
 	}
 
 }
@@ -197,7 +207,10 @@ func (d *Driver) Start() error {
 // agentDown 该回调函数被消息总线接收协程所调用
 // 用于处理蓝牙透明代理下行数据
 func (d *Driver) agentDown(topic string, envelope types.MessageEnvelope) error {
-	dataparse.SendToBlE(d.BleController, envelope)
+	if err := dataparse.SendToBlE(d.BleController, envelope); err == nil {
+		fmt.Printf("【透明代理（↓）】下行数据发送成功 ✔ \n") // 记录错误日志
+	}
+
 	return nil
 }
 

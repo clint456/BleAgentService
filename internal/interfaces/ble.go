@@ -21,7 +21,7 @@ type SerialResponse struct {
 }
 
 type SerialQueue interface {
-	SendCommand(command []byte, timeout, delay time.Duration) (string, error)
+	SendCommand(command []byte, timeout, ReadDelay time.Duration) (string, error)
 	Close()
 }
 
