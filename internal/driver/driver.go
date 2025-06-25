@@ -149,24 +149,6 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 	}
 	*/
 
-	/* 解析上报命令
-	1. 检查statusCode字段
-	2. 判断commandType字段，分发allstatus、monitor协程任务
-	*/
-
-	/* allstatus任务
-	1. 订阅系统事件
-	2. 获取status字段以及设备相对应字段，json格式化，交由ai处理,整理发送数据包
-	3. ataparse.SendToBlE发送给设备作为响应
-	*/
-
-	/* monitor 协程任务
-	1. 判断上一个监听是否结束
-	2. 订阅指定设备事件
-	3. 获取响应字段，格式化，整理发送数据包
-	4. dataparse.SendToBlE发送给设备作为响应
-	*/
-
 	if strings.Contains(cmd, "allstatus") {
 		fmt.Printf("【运维——allstatus】开始查询所有设备状态")
 		err := d.MessageBusClient.SubscribeResponse("edgex/response/#")
@@ -175,7 +157,7 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 		}
 		fmt.Printf("【运维——allstatus】订阅响应成功")
 		// 发送请求
-		d.MessageBusClient.SetTimeout(10 * time.Second)
+		d.MessageBusClient.SetTimeout(2 * time.Second)
 		resp, err := d.MessageBusClient.Request("edgex/core/commandquery/request/all", "")
 		if err != nil {
 			log.Fatalf("【运维——allstatus】请求失败: %v", err)
@@ -194,6 +176,12 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 
 	} else if strings.Contains(cmd, "status") {
 		fmt.Printf("【运维——status】发起status请求: %v", cmd)
+	} else {
+		fmt.Printf("命名不支持！！")
+		err := ble.SendJSONOverBLE(d.BleController.GetQueue(), "命名不支持！！")
+		if err != nil {
+			log.Fatalf("【运维——status】发送响应失败: %v\n", err)
+		}
 	}
 
 }
