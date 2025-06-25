@@ -106,7 +106,7 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	}
 	*/
 	// 测试发送连通性
-	d.MessageBusClient.Subscribe([]string{"edgex/service/data/device_ble/dwon"}, d.agentDown)
+	d.MessageBusClient.Subscribe("edgex/service/data/device_ble/dwon", d.agentDown)
 	return nil
 }
 
@@ -168,7 +168,8 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 
 	switch cmd {
 	case "allstatus":
-		d.MessageBusClient.Subscribe([]string{"edgex/service/data/device_ble/dwon"}, d.agentDown)
+		fmt.Printf("【运维】开始查询所有设备状态")
+
 	case "status":
 
 	}

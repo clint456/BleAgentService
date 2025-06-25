@@ -3,7 +3,6 @@ module device-ble
 go 1.24.3
 
 require (
-	github.com/clint456/edgex-messagebus-client v1.1.2
 	github.com/edgexfoundry/device-sdk-go/v4 v4.0.0
 	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.0.3
 	github.com/edgexfoundry/go-mod-core-contracts/v4 v4.0.1
