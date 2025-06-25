@@ -23,6 +23,7 @@ package driver
 
 import (
 	internalif "device-ble/internal/interfaces"
+	"log"
 	"time"
 
 	"device-ble/pkg/ble"
@@ -169,6 +170,17 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 	switch cmd {
 	case "allstatus":
 		fmt.Printf("【运维】开始查询所有设备状态")
+		err := d.MessageBusClient.SubscribeResponse("edgex/response/core-command/#")
+		if err != nil {
+			log.Fatalf("订阅响应失败: %v", err)
+		}
+		// 发送请求
+		payload := ""
+		resp, err := d.MessageBusClient.Request("edgex/core/commandquery/request/all", payload)
+		if err != nil {
+			log.Fatalf("请求失败: %v", err)
+		}
+		fmt.Printf("请求系统响应： %v", resp)
 
 	case "status":
 

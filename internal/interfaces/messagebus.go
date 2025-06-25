@@ -8,4 +8,6 @@ import "github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 type MessageBusClient interface {
 	Publish(topic string, data interface{}) error
 	Subscribe(topic1 string, handler func(topic2 string, envelope types.MessageEnvelope) error) error
+	Request(topic string, data interface{}) (types.MessageEnvelope, error)
+	SubscribeResponse(topic string) error
 }

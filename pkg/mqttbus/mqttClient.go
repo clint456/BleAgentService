@@ -57,5 +57,9 @@ func (e *EdgexMessageBusClient) Publish(topic string, data interface{}) error {
 }
 
 func (e *EdgexMessageBusClient) SubscribeResponse(topic string) error {
- 	e.clint.SubscribeResponse(topic string,)
+	return e.client.SubscribeResponse(topic)
+}
+
+func (e *EdgexMessageBusClient) Request(topic string, data interface{}) (types.MessageEnvelope, error) {
+	return e.client.Request(topic, data)
 }

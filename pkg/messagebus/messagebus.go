@@ -138,7 +138,7 @@ func (c *Client) Publish(topic string, data interface{}) error {
 }
 
 // Request 发送带 RequestID 的请求并等待响应，适用于 RPC 风格通信
-func (c *Client) Request(topic string, data []byte) (types.MessageEnvelope, error) {
+func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope, error) {
 	if !c.IsConnected() {
 		return types.MessageEnvelope{}, fmt.Errorf("MessageBus 未连接")
 	}
