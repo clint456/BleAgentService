@@ -2,9 +2,9 @@ package mqttbus
 
 import (
 	internalif "device-ble/internal/interfaces"
+	"device-ble/pkg/messagebus"
 	"fmt"
 
-	messagebus "github.com/clint456/edgex-messagebus-client"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 )

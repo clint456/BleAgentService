@@ -166,6 +166,13 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 	4. dataparse.SendToBlE发送给设备作为响应
 	*/
 
+	switch cmd {
+	case "allstatus":
+		d.MessageBusClient.Subscribe([]string{"edgex/service/data/device_ble/dwon"}, d.agentDown)
+	case "status":
+
+	}
+
 }
 
 // Start 启动设备服务
