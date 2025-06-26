@@ -70,7 +70,7 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	}
 
 	d.logger.Info("BLE代理服务初始化完成")
-	d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown)
+	d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown) // 转发下行数据
 	return nil
 }
 
@@ -96,10 +96,10 @@ func (d *Driver) Start() error {
 
 // agentDown 处理蓝牙透明代理下行数据。
 func (d *Driver) agentDown(topic string, envelope types.MessageEnvelope) error {
-	if err := dataparse.SendToBlE(d.BleController, envelope); err == nil {
-		d.logger.Infof("【透明代理（↓）】下行数据发送成功 ✔") // 记录成功日志
+	if err := dataparse.SendToBlE(d.BleController, envelope); err != nil {
+		d.logger.Infof("【透明代理（↓）】下行数据发送失败 ❌, err: %v", err) // 记录成功日志
 	}
-
+	d.logger.Infof("【透明代理（↓）】下行数据发送成功 ✔, err: %v") // 记录成功日志
 	return nil
 }
 
