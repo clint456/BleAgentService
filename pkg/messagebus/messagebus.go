@@ -145,7 +145,7 @@ func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope,
 	}
 
 	reqID := uuid.NewString()
-	respCh := make(chan types.MessageEnvelope, 1)
+	respCh := make(chan types.MessageEnvelope, 100)
 	c.responseChMap.Store(reqID, respCh)
 	defer c.responseChMap.Delete(reqID)
 
