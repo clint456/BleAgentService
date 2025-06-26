@@ -108,10 +108,11 @@ func ExtractProfileAndResources(envelope *types.MessageEnvelope) ([]byte, error)
 	}
 
 	// 转换为 JSON
-	jsonData, err := json.Marshal(result)
+	jsonData, err := json.MarshalIndent(result, "", "  ") // 格式化输出
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal result to JSON: %v", err)
 	}
 
+	fmt.Println(string(jsonData))
 	return jsonData, nil
 }

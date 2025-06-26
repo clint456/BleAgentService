@@ -17,7 +17,7 @@ const (
 	TopicResponseAll  = "edgex/response/#"
 )
 
-// CommandService 负责命令分发和业务处理。
+// CommandService 负责上行命令分发和业务处理。
 type CommandService struct {
 	Logger           logger.LoggingClient
 	MessageBusClient interfaces.MessageBusClient
@@ -62,7 +62,7 @@ func (cs *CommandService) HandleCommand(cmd string) {
 	}
 }
 
-// AgentService 负责透明代理数据处理。
+// AgentService 负责透明代理上行数据处理。
 type AgentService struct {
 	Logger           logger.LoggingClient
 	MessageBusClient interfaces.MessageBusClient
