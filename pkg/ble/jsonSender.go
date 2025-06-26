@@ -65,19 +65,17 @@ func SendJSONOverBLE(sq interfaces.SerialQueue, jsonData interface{}) error {
 		binary.BigEndian.PutUint16(packetData[len(Prefix)+2:], packet.Total)
 		copy(packetData[len(Prefix)+HeaderSize:], packet.Payload)
 		copy(packetData[len(Prefix)+HeaderSize+len(packet.Payload):], Suffix)
-		response, err := sq.SendCommand(packetData, 300*time.Microsecond, 1*time.Microsecond)
-		if err != nil {
-			fmt.Printf("❗️ Error sending packet %d: %v\n", packet.Index, err)
-			continue
-		}
+
+		response, err := sq.SendCommand(packetData, 300*time.Millisecond, 1*time.Millisecond, 100*time.Millisecond)
 		if strings.Contains(response, "OK") {
-			fmt.Printf("⚡ 数据包 %v 的子包发送 %v 成功\n", tag, packet.Index)
+			fmt.Printf("⚡  数据包： %v  ⬇️ 子包：  %d/%d 发送成功, size：%d bytes\n", tag, packet.Index+1, packet.Total, len(packetData))
+		} else if strings.Contains(response, "ERROR") {
+			fmt.Printf("⛔️  数据包： %v  ⬇️ 子包：  %d/%d 发送失败\n", tag, packet.Index+1, packet.Total)
+			return err
+		} else {
+			fmt.Printf("❗❓  数据包： %v  ⬇️ 子包：  %d/%d 未知回显：%v, error：%v\n", tag, packet.Index+1, packet.Total, response, err)
+			return err
 		}
-		if strings.Contains(response, "ERROR") {
-			fmt.Printf("⛔️  数据包 %v 的发送子包 %v 失败\n", tag, packet.Index)
-		}
-		fmt.Printf("⬇️  Sent packet %d/%d, size: %d bytes\n", packet.Index+1, packet.Total, len(packetData))
-		time.Sleep(1 * time.Millisecond)
 	}
 	fmt.Printf("✅️ All packets of Packet %v sent and verified.\n", tag)
 	return nil

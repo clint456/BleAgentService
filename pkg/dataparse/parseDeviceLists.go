@@ -19,8 +19,8 @@ type CommandInfo struct {
 	ResourceNames []string `json:"resourceNames"`
 }
 
-// ExtractProfileAndResources 解析 payload 并返回 JSON 格式的数据
-func ExtractProfileAndResources(envelope *types.MessageEnvelope) ([]byte, error) {
+// ParseDeviceLists 解析 payload 并返回 JSON 格式的数据
+func ParseDeviceLists(envelope *types.MessageEnvelope) ([]byte, error) {
 	// 断言 Payload 为 map[string]interface{}
 	payload, ok := envelope.Payload.(map[string]interface{})
 	if !ok {

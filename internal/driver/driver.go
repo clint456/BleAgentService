@@ -103,20 +103,6 @@ func (d *Driver) agentDown(topic string, envelope types.MessageEnvelope) error {
 	return nil
 }
 
-// HandleReadCommands 处理读取命令。
-func (d *Driver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
-	d.logger.Debugf("处理设备 %s 的读取命令", deviceName)
-	// TODO: 实现UI具体的读取逻辑
-	return nil, fmt.Errorf("读取命令暂未实现")
-}
-
-// HandleWriteCommands 处理写入命令。
-func (d *Driver) HandleWriteCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest, params []*dsModels.CommandValue) error {
-	d.logger.Debugf("处理设备 %s 的写入命令", deviceName)
-	// TODO: 实现UI具体的写入逻辑
-	return nil
-}
-
 // Discover 触发协议特定的设备发现。
 func (s *Driver) Discover() error {
 	return fmt.Errorf("Discover function is yet to be implemented!")

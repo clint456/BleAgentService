@@ -38,11 +38,11 @@ func (c *BLEController) InitializeAsPeripheral() error {
 		CommandStartAdvertising,
 	}
 	for _, cmd := range initCommands {
-		response, err := c.Queue.SendCommand([]byte(cmd), 2*time.Second, 1*time.Second)
+		response, err := c.Queue.SendCommand([]byte(cmd), 2*time.Second, 1*time.Second, 100*time.Millisecond)
 		if strings.Contains(response, "OK") {
 			c.logger.Infof("✅ 发送 %q 成功, 回显： %v", cmd, response)
 		} else if strings.Contains(response, "ERROR") {
-			c.logger.Errorf("⛔️  发送 %q 失败, 回显： %v", cmd, response)
+			c.logger.Errorf("⛔️  发送 %q 失败: %q , 回显： %v ", cmd, err, response)
 		} else if err != nil {
 			c.logger.Errorf("❗❓未知回显 :%v, response:%v", err, response)
 		} else {

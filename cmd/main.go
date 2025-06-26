@@ -54,6 +54,7 @@ func main() {
 		lc,
 		func(cmd string) { d.HandleUpCommandCallback(cmd) },
 		func(data string) { d.HandleUpAgentCallback(data) },
+		5,
 	)
 
 	// 6. 初始化BLE控制器
