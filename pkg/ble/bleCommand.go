@@ -73,7 +73,7 @@ func SetDeviceName(name string) (string, error) {
 	if name == "" {
 		return "", fmt.Errorf("device name cannot be empty")
 	}
-	return fmt.Sprintf("AT+QBLENAME=\"%s\"\r\n", name), nil
+	return fmt.Sprintf("AT+QBLENAME=%s\r\n", name), nil
 }
 
 // QueryAddress 生成查询 BLE MAC 地址的 AT 命令
@@ -100,18 +100,15 @@ func AddService(uuid string) (string, error) {
 	if uuid == "" {
 		return "", fmt.Errorf("UUID cannot be empty")
 	}
-	return fmt.Sprintf("AT+QBLEGATTSSRV=\"%s\"\r\n", uuid), nil
+	return fmt.Sprintf("AT+QBLEGATTSSRV=%s\r\n", uuid), nil
 }
 
 // AddCharacteristic 生成添加特征值的 AT 命令
-func AddCharacteristic(uuid string, prop int) (string, error) {
+func AddCharacteristic(uuid string) (string, error) {
 	if uuid == "" {
 		return "", fmt.Errorf("UUID cannot be empty")
 	}
-	if prop <= 0 {
-		return "", fmt.Errorf("invalid properties value: %d", prop)
-	}
-	return fmt.Sprintf("AT+QBLEGATTSCHAR=\"%s\",%d\r\n", uuid, prop), nil
+	return fmt.Sprintf("AT+QBLEGATTSCHAR=%s\r\n", uuid), nil
 }
 
 // FinishGATTServer 生成提交 GATT 服务定义的 AT 命令
@@ -130,5 +127,5 @@ func SendNotify(connIdx, handle int, value string) (string, error) {
 	if value == "" {
 		return "", fmt.Errorf("value cannot be empty")
 	}
-	return fmt.Sprintf("AT+QBLEGATTSNTFY=%d,%d,\"%s\"\r\n", connIdx, handle, value), nil
+	return fmt.Sprintf("AT+QBLEGATTSNTFY=%d,%d,%s\r\n", connIdx, handle, value), nil
 }

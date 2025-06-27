@@ -38,7 +38,7 @@ func (d *Driver) HandleWriteCommands(deviceName string, protocols map[string]mod
 	// TODO: 实现UI具体的写入逻辑
 	fmt.Printf("deviceName: \n\t%s,\n protocols: \n\t%v,\n reqs:\t%v,\n params:\n\t%v\n", deviceName, protocols, reqs, params)
 	for _, param := range params {
-		if err := d.handleWrite(param, &d.BleController); err != nil {
+		if err := d.handleWrite(param, d.BleController); err != nil {
 			return err
 		}
 	}
@@ -46,7 +46,7 @@ func (d *Driver) HandleWriteCommands(deviceName string, protocols map[string]mod
 }
 
 // handleWrite 对命令进行分类处理
-func (d *Driver) handleWrite(param *dsModels.CommandValue, ble *interfaces.BLEController) error {
+func (d *Driver) handleWrite(param *dsModels.CommandValue, ble interfaces.BLEController) error {
 	switch param.DeviceResourceName {
 	case "Setting&&PeripheralInit":
 		objValue, err := param.ObjectValue()
@@ -61,14 +61,12 @@ func (d *Driver) handleWrite(param *dsModels.CommandValue, ble *interfaces.BLECo
 		if !ok {
 			return fmt.Errorf("输入的BleName不是String类型")
 		}
-		cmdTxPower, ok := cmd["TxPower"].(int8)
-		if !ok {
-			return fmt.Errorf("输入的TxPower不是int8类型")
-		}
+		// cmdTxPower, ok := cmd["TxPower"].(int8)
+		// if !ok {
+		// 	return fmt.Errorf("输入的TxPower不是int8类型")
+		// }
 
-		fmt.Printf("Setting&&PeripheralInit  BleName: %v, TxPower: %v\n", cmdName, cmdTxPower)
-
-		return d.handleSettingPeripheralInit(cmdName, cmdTxPower, ble)
+		return d.handleSettingPeripheralInit(cmdName, ble)
 
 	case "SendString":
 		{
@@ -80,7 +78,7 @@ func (d *Driver) handleWrite(param *dsModels.CommandValue, ble *interfaces.BLECo
 }
 
 // 自定义初始化蓝牙模块
-func (d *Driver) handleSettingPeripheralInit(BleName string, TxPower int8, ble *interfaces.BLEController) error {
+func (d *Driver) handleSettingPeripheralInit(BleName string, ble interfaces.BLEController) error {
 	var cmds []string
 	// 1. 添加通用模块控制命令
 	cmds = append(cmds, blecommand.Restart()) // AT+QRST\r\n
@@ -97,35 +95,28 @@ func (d *Driver) handleSettingPeripheralInit(BleName string, TxPower int8, ble *
 	} else {
 		log.Printf("Error generating SetDeviceName: %v", err)
 	}
-	// 3. 添加广播控制命令
-	cmds = append(cmds, blecommand.StartAdvertising()) // AT+QBLEADVSTART\r\n
 
 	// 4. 添加 GATT 服务端命令
 	if cmd, err := blecommand.AddService("180F"); err == nil { // 示例 UUID
-		cmds = append(cmds, cmd) // AT+QBLEGATTSSRV="180F"\r\n
+		cmds = append(cmds, cmd) // AT+QBLEGATTSSRV=180F\r\n
 	} else {
 		log.Printf("Error generating AddService: %v", err)
 	}
 
-	if cmd, err := blecommand.AddCharacteristic("2A19", 0x02|0x10); err == nil { // Read + Notify
-		cmds = append(cmds, cmd) // AT+QBLEGATTSCHAR="2A19",18\r\n
+	if cmd, err := blecommand.AddCharacteristic("2A19"); err == nil { // Read + Notify
+		cmds = append(cmds, cmd) // AT+QBLEGATTSCHAR=2A19\r\n
 	} else {
 		log.Printf("Error generating AddCharacteristic: %v", err)
 	}
 
 	cmds = append(cmds, blecommand.FinishGATTServer()) // AT+QBLEGATTSSRVDONE\r\n
-
-	if cmd, err := blecommand.SendNotify(0, 1, "1234"); err == nil { // 示例 Notify
-		cmds = append(cmds, cmd) // AT+QBLEGATTSNTFY=0,1,"1234"\r\n
-	} else {
-		log.Printf("Error generating SendNotify: %v", err)
-	}
-
+	// 3. 添加广播控制命令
+	cmds = append(cmds, blecommand.StartAdvertising()) // AT+QBLEADVSTART\r\n
 	// 打印 cmds 切片内容
 	fmt.Println("Generated AT Commands:")
 	for i, cmd := range cmds {
 		fmt.Printf("%d: %s", i, cmd)
 	}
 
-	return nil
+	return ble.CustomInitializeBle(cmds)
 }

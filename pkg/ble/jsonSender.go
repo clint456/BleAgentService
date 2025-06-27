@@ -49,7 +49,7 @@ func splitIntoPackets(data []byte) []Packet {
 }
 
 // SendJSONOverBLE 发送 JSON 数据的主要函数。
-func SendJSONOverBLE(sq interfaces.SerialQueue, jsonData interface{}) error {
+func SendJSONOverBLE(sq interfaces.SerialQueueInterface, jsonData interface{}) error {
 	// 这里需要传入logger参数，建议后续重构接口
 	// 目前先用fmt.Println模拟日志，后续可传入logger
 	tag := uuid.New().String()
