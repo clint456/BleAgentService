@@ -60,6 +60,26 @@ type Config struct {
 
 	//Allows providing a function which controls how/where connections to a router are proxied.
 	RouterProxy func(addr string) *transport.ProxyConfiguration `json:"-"`
+
+	// If set to a number greater than one, the sdk will attempt to create multiple connections to edge routers.
+	// This configuration value should not be considered part of the stable API yet. It currently defaults to one,
+	// but it may default to a larger number at some point in the future or be removed. If set to zero, it will
+	// be reset to one.
+	MaxDefaultConnections uint32 `json:"-"`
+
+	// If set to a number greater than zero, the sdk will attempt to create one or more separate connection to
+	// each edge routers for control plane data, such as dials. This configuration value should not be considered
+	// part of the stable API yet. It currently defaults to zero, but it may default to 1 at some point in the future
+	// or be removed.
+	MaxControlConnections uint32 `json:"-"`
+}
+
+func (cfg *Config) SetMaxControlConnections(val uint32) {
+	cfg.MaxControlConnections = val
+}
+
+func (cfg *Config) SetMaxDefaultConnections(val uint32) {
+	cfg.MaxDefaultConnections = val
 }
 
 // NewConfig will create a new Config object from a provided Ziti Edge Client API URL and identity configuration.

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/michaelquigley/pfxlog"
 	"github.com/openziti/edge-api/rest_model"
+	"github.com/openziti/sdk-golang/xgress"
 	"github.com/openziti/sdk-golang/ziti/edge"
 	"github.com/pkg/errors"
 	"math"
@@ -94,6 +95,7 @@ type edgeListener struct {
 	manualStart bool
 	established atomic.Bool
 	eventC      chan *edge.ListenerEvent
+	envF        func() xgress.Env
 }
 
 func (listener *edgeListener) Id() uint32 {
@@ -121,7 +123,7 @@ func (listener *edgeListener) updateCostAndPrecedence(cost *uint16, precedence *
 	logger.Debug("sending update bind request to edge router")
 	request := edge.NewUpdateBindMsg(listener.edgeChan.Id(), listener.token, cost, precedence)
 	listener.edgeChan.TraceMsg("updateCostAndPrecedence", request)
-	return request.WithTimeout(5 * time.Second).SendAndWaitForWire(listener.edgeChan.Channel)
+	return request.WithTimeout(5 * time.Second).SendAndWaitForWire(listener.edgeChan.GetControlSender())
 }
 
 func (listener *edgeListener) SendHealthEvent(pass bool) error {
@@ -134,7 +136,7 @@ func (listener *edgeListener) SendHealthEvent(pass bool) error {
 	logger.Debug("sending health event to edge router")
 	request := edge.NewHealthEventMsg(listener.edgeChan.Id(), listener.token, pass)
 	listener.edgeChan.TraceMsg("healthEvent", request)
-	return request.WithTimeout(5 * time.Second).SendAndWaitForWire(listener.edgeChan.Channel)
+	return request.WithTimeout(5 * time.Second).SendAndWaitForWire(listener.edgeChan.GetControlSender())
 }
 
 func (listener *edgeListener) Close() error {
@@ -163,7 +165,7 @@ func (listener *edgeListener) close(closedByRemote bool) error {
 
 	unbindRequest := edge.NewUnbindMsg(edgeChan.Id(), listener.token)
 	listener.edgeChan.TraceMsg("close", unbindRequest)
-	if err := unbindRequest.WithTimeout(5 * time.Second).SendAndWaitForWire(edgeChan.Channel); err != nil {
+	if err := unbindRequest.WithTimeout(5 * time.Second).SendAndWaitForWire(edgeChan.GetControlSender()); err != nil {
 		logger.WithError(err).Error("unable to unbind session for conn")
 		return err
 	}

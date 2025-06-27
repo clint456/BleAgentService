@@ -18,6 +18,7 @@ package ziti
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/go-openapi/strfmt"
 	"github.com/google/uuid"
@@ -26,9 +27,9 @@ import (
 	"github.com/openziti/edge-api/rest_client_api_client/service"
 	rest_session "github.com/openziti/edge-api/rest_client_api_client/session"
 	"github.com/openziti/foundation/v2/concurrenz"
-	"github.com/openziti/foundation/v2/errorz"
 	"github.com/openziti/foundation/v2/stringz"
 	apis "github.com/openziti/sdk-golang/edge-apis"
+	"github.com/openziti/sdk-golang/xgress"
 	"github.com/openziti/secretstream/kx"
 	"math"
 	"math/rand"
@@ -43,8 +44,8 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/michaelquigley/pfxlog"
-	"github.com/openziti/channel/v3"
-	"github.com/openziti/channel/v3/latency"
+	"github.com/openziti/channel/v4"
+	"github.com/openziti/channel/v4/latency"
 	"github.com/openziti/edge-api/rest_client_api_client/current_api_session"
 	"github.com/openziti/edge-api/rest_model"
 	"github.com/openziti/foundation/v2/versions"
@@ -55,7 +56,6 @@ import (
 	"github.com/openziti/sdk-golang/ziti/signing"
 	"github.com/openziti/transport/v2"
 	cmap "github.com/orcaman/concurrent-map/v2"
-	"github.com/pkg/errors"
 	metrics2 "github.com/rcrowley/go-metrics"
 	"github.com/sirupsen/logrus"
 )
@@ -193,8 +193,15 @@ type ContextImpl struct {
 	authQueryHandlers map[string]func(query *rest_model.AuthQueryDetail, response MfaCodeResponse) error
 
 	events.EventEmmiter
+	authAttemptLock                 sync.Mutex
 	lastSuccessfulApiSessionRefresh time.Time
 	routerProxy                     func(addr string) *transport.ProxyConfiguration
+
+	maxControlConnections int
+	maxDefaultConnections int
+
+	lock      sync.Mutex
+	xgressEnv xgress.Env
 }
 
 func (context *ContextImpl) AddServiceAddedListener(handler func(Context, *rest_model.ServiceDetail)) func() {
@@ -485,8 +492,13 @@ func (context *ContextImpl) Sessions() ([]*rest_model.SessionDetail, error) {
 
 func (context *ContextImpl) OnClose(routerConn edge.RouterConn) {
 	logrus.Debugf("connection to router [%s] was closed", routerConn.Key())
-	context.Emit(EventRouterDisconnected, routerConn.GetRouterName(), routerConn.Key())
-	context.routerConnections.Remove(routerConn.Key())
+	removed := context.routerConnections.RemoveCb(routerConn.Key(), func(key string, v edge.RouterConn, exists bool) bool {
+		return exists && v == routerConn
+	})
+
+	if removed {
+		context.Emit(EventRouterDisconnected, routerConn.GetRouterName(), routerConn.Key())
+	}
 }
 
 func (context *ContextImpl) processServiceUpdates(services []*rest_model.ServiceDetail) {
@@ -653,12 +665,14 @@ func (context *ContextImpl) refreshSessions() {
 }
 
 func (context *ContextImpl) RefreshServices() error {
-	return context.refreshServices(true)
+	return context.refreshServices(true, false)
 }
 
-func (context *ContextImpl) refreshServices(forceCheck bool) error {
-	if err := context.ensureApiSession(); err != nil {
-		return fmt.Errorf("failed to refresh services: %v", err)
+func (context *ContextImpl) refreshServices(forceRefresh, refreshAfterAuth bool) error {
+	if !refreshAfterAuth { // if in authenticate mutex, can't re-auth
+		if err := context.ensureApiSession(); err != nil {
+			return fmt.Errorf("failed to refresh services: %v", err)
+		}
 	}
 
 	var checkService bool
@@ -666,28 +680,35 @@ func (context *ContextImpl) refreshServices(forceCheck bool) error {
 	var err error
 
 	log := pfxlog.Logger()
-	log.Debug("checking if service updates available")
-	if checkService, lastServiceUpdate, err = context.CtrlClt.IsServiceListUpdateAvailable(); err != nil {
-		log.WithError(err).Error("failed to check if service list update is available")
-		target := &current_api_session.ListServiceUpdatesUnauthorized{}
-		if errors.As(err, &target) {
-			checkService = true
-		} else {
-			if err = context.Authenticate(); err != nil {
-				log.WithError(err).Error("unable to re-authenticate during session refresh")
+
+	if !forceRefresh {
+		log.Debug("checking if service updates available")
+		if checkService, lastServiceUpdate, err = context.CtrlClt.IsServiceListUpdateAvailable(); err != nil {
+			log.WithError(err).Error("failed to check if service list update is available")
+			target := &current_api_session.ListServiceUpdatesUnauthorized{}
+			if errors.As(err, &target) {
+				checkService = true
 			} else {
-				if checkService, lastServiceUpdate, err = context.CtrlClt.IsServiceListUpdateAvailable(); err != nil {
-					checkService = true
+				if err = context.Authenticate(); err != nil {
+					log.WithError(err).Error("unable to re-authenticate during session refresh")
+				} else {
+					if checkService, lastServiceUpdate, err = context.CtrlClt.IsServiceListUpdateAvailable(); err != nil {
+						checkService = true
+					}
 				}
 			}
 		}
 	}
 
-	if checkService || forceCheck {
+	if checkService || forceRefresh {
 		log.Debug("refreshing services")
 
 		services, err := context.CtrlClt.GetServices()
 		if err != nil {
+			if refreshAfterAuth { // in authenticate mutex, can't re-auth
+				return err
+			}
+
 			target := &service.ListServicesUnauthorized{}
 			if errors.As(err, &target) {
 				log.Info("attempting to re-authenticate")
@@ -820,7 +841,7 @@ func (context *ContextImpl) runRefreshes() {
 
 		case <-svcRefreshTick.C:
 			log.Debug("refreshing services")
-			if err := context.refreshServices(false); err != nil {
+			if err := context.refreshServices(false, false); err != nil {
 				log.WithError(err).Error("failed to load service updates")
 			}
 
@@ -850,7 +871,7 @@ func (context *ContextImpl) EnsureAuthenticated(options edge.ConnOptions) error 
 
 func (context *ContextImpl) GetCurrentIdentity() (*rest_model.IdentityDetail, error) {
 	if err := context.ensureApiSession(); err != nil {
-		return nil, errors.Wrap(err, "failed to establish api session")
+		return nil, fmt.Errorf("failed to establish api session (%w)", err)
 	}
 
 	return context.CtrlClt.GetCurrentIdentity()
@@ -928,6 +949,9 @@ func (context *ContextImpl) Reauthenticate() error {
 }
 
 func (context *ContextImpl) Authenticate() error {
+	context.authAttemptLock.Lock()
+	defer context.authAttemptLock.Unlock()
+
 	if context.CtrlClt.GetCurrentApiSession() != nil {
 		if time.Since(context.lastSuccessfulApiSessionRefresh) < 5*time.Second {
 			return nil
@@ -1002,7 +1026,7 @@ func (context *ContextImpl) onFullAuth(apiSession apis.ApiSession) error {
 	context.Emit(EventAuthenticationStateFull, apiSession)
 
 	// get services
-	if err := context.RefreshServices(); err != nil {
+	if err := context.refreshServices(true, true); err != nil {
 		doOnceErr = err
 	}
 
@@ -1069,6 +1093,7 @@ func (context *ContextImpl) DialWithOptions(serviceName string, options *DialOpt
 		Identity:        options.Identity,
 		AppData:         options.AppData,
 		StickinessToken: options.StickinessToken,
+		SdkFlowControl:  (options.SdkFlowControl != nil && *options.SdkFlowControl) || context.maxDefaultConnections > 1,
 	}
 	if edgeDialOptions.GetConnectTimeout() == 0 {
 		edgeDialOptions.ConnectTimeout = 15 * time.Second
@@ -1080,7 +1105,7 @@ func (context *ContextImpl) DialWithOptions(serviceName string, options *DialOpt
 
 	svc, ok := context.GetService(serviceName)
 	if !ok {
-		return nil, errors.Errorf("service '%s' not found", serviceName)
+		return nil, fmt.Errorf("service '%s' not found", serviceName)
 	}
 
 	context.CtrlClt.PostureCache.AddActiveService(*svc.ID)
@@ -1091,7 +1116,7 @@ func (context *ContextImpl) DialWithOptions(serviceName string, options *DialOpt
 	if err != nil {
 		context.deleteServiceSessions(*svc.ID)
 		if session, err = context.createSessionWithBackoff(svc, SessionType(SessionDial), options); err != nil {
-			return nil, errors.Wrapf(err, "unable to dial service '%v'", serviceName)
+			return nil, fmt.Errorf("unable to dial service '%v' (%w)", serviceName, err)
 		}
 	}
 
@@ -1104,13 +1129,13 @@ func (context *ContextImpl) DialWithOptions(serviceName string, options *DialOpt
 	var refreshErr error
 	if _, refreshErr = context.refreshSession(session); refreshErr == nil {
 		// if the session wasn't expired, no reason to try again, return the failure
-		return nil, errors.Wrapf(err, "unable to dial service '%s'", serviceName)
+		return nil, fmt.Errorf("unable to dial service '%s' (%w)", serviceName, err)
 	}
 
 	context.deleteServiceSessions(*svc.ID)
 	if session, refreshErr = context.createSessionWithBackoff(svc, SessionType(SessionDial), options); refreshErr != nil {
 		// couldn't create a new session, report the error
-		return nil, errors.Wrapf(refreshErr, "unable to dial service '%s'", serviceName)
+		return nil, fmt.Errorf("unable to dial service '%s' (%w)", serviceName, refreshErr)
 	}
 
 	// retry with new session
@@ -1119,7 +1144,7 @@ func (context *ContextImpl) DialWithOptions(serviceName string, options *DialOpt
 		return conn, nil
 	}
 
-	return nil, errors.Wrapf(err, "unable to dial service '%s'", serviceName)
+	return nil, fmt.Errorf("unable to dial service '%s' (%w)", serviceName, err)
 }
 
 // GetServiceForAddr finds the service with intercept that matches best to given address
@@ -1149,7 +1174,7 @@ func (context *ContextImpl) GetServiceForAddr(network, hostname string, port uin
 	})
 
 	if svc == nil {
-		return nil, -1, errors.Errorf("no service for address[%s:%s:%d]", network, hostname, port)
+		return nil, -1, fmt.Errorf("no service for address[%s:%s:%d]", network, hostname, port)
 	}
 
 	return svc, score, nil
@@ -1202,7 +1227,7 @@ func (context *ContextImpl) dialSession(service *rest_model.ServiceDetail, sessi
 	if err != nil {
 		return nil, err
 	}
-	return edgeConnFactory.Connect(service, session, options)
+	return edgeConnFactory.Connect(service, session, options, context.getXgressEnv)
 }
 
 func (context *ContextImpl) ensureApiSession() error {
@@ -1226,7 +1251,7 @@ func (context *ContextImpl) ListenWithOptions(serviceName string, options *Liste
 	if s, ok := context.GetService(serviceName); ok {
 		return context.listenSession(s, options)
 	}
-	return nil, errors.Errorf("service '%s' not found in ziti network", serviceName)
+	return nil, fmt.Errorf("service '%s' not found in ziti network", serviceName)
 }
 
 func (context *ContextImpl) listenSession(service *rest_model.ServiceDetail, options *ListenOptions) (edge.Listener, error) {
@@ -1250,6 +1275,8 @@ func (context *ContextImpl) listenSession(service *rest_model.ServiceDetail, opt
 	if edgeListenOptions.MaxTerminators < 1 {
 		edgeListenOptions.MaxTerminators = 1
 	}
+
+	edgeListenOptions.SdkFlowControl = options.SdkFlowControl != nil && *options.SdkFlowControl
 
 	if listenerMgr, err := newListenerManager(service, context, edgeListenOptions, options.WaitForNEstablishedListeners); err != nil {
 		return nil, err
@@ -1284,9 +1311,7 @@ func (context *ContextImpl) getEdgeRouterConn(session *rest_model.SessionDetail,
 	var bestER edge.RouterConn
 	var unconnected []*rest_model.SessionEdgeRouter
 	for _, edgeRouter := range session.EdgeRouters {
-		for proto, addr := range edgeRouter.SupportedProtocols {
-			addr = strings.Replace(addr, "://", ":", 1)
-			edgeRouter.SupportedProtocols[proto] = addr
+		for _, addr := range edgeRouter.SupportedProtocols {
 			if er, found := context.routerConnections.Get(addr); found {
 				h := context.metrics.Histogram("latency." + addr).(metrics2.Histogram)
 				if h.Mean() < float64(bestLatency) {
@@ -1409,7 +1434,13 @@ func (context *ContextImpl) connectEdgeRouter(routerName, ingressUrl string) *ed
 	edgeConn := network.NewEdgeConnFactory(routerName, ingressUrl, context)
 	options := channel.DefaultOptions()
 	options.ConnectTimeout = 15 * time.Second
-	ch, err := channel.NewChannel(fmt.Sprintf("ziti-sdk[router=%v]", ingressUrl), dialer, edgeConn, options)
+
+	headers := channel.Headers{}
+	if context.maxControlConnections > 0 || context.maxDefaultConnections > 1 {
+		headers.PutBoolHeader(channel.IsGroupedHeader, true)
+		headers.PutStringHeader(channel.TypeHeader, edge.ChannelTypeDefault)
+	}
+	underlay, err := dialer.CreateWithHeaders(options.ConnectTimeout, headers)
 	if err != nil {
 		logger.Error(err)
 		return &edgeRouterConnResult{
@@ -1418,10 +1449,36 @@ func (context *ContextImpl) connectEdgeRouter(routerName, ingressUrl string) *ed
 			err:        err,
 		}
 	}
+
+	var ch channel.Channel
+
+	if isGrouped, _ := channel.Headers(underlay.Headers()).GetBoolHeader(channel.IsGroupedHeader); isGrouped {
+		var dialSdkChannel = edge.NewDialSdkChannel(dialer, underlay, context.maxDefaultConnections, context.maxControlConnections)
+		multiChannelConfig := &channel.MultiChannelConfig{
+			LogicalName:     fmt.Sprintf("ziti-sdk[router=%v]", ingressUrl),
+			Options:         options,
+			UnderlayHandler: dialSdkChannel,
+			BindHandler:     edgeConn,
+			Underlay:        underlay,
+		}
+		ch, err = channel.NewMultiChannel(multiChannelConfig)
+	} else {
+		ch, err = channel.NewChannelWithUnderlay(fmt.Sprintf("ziti-sdk[router=%v]", ingressUrl), underlay, edgeConn, options)
+	}
+
+	if err != nil {
+		logger.Error(err)
+		return &edgeRouterConnResult{
+			routerUrl:  ingressUrl,
+			routerName: routerName,
+			err:        err,
+		}
+	}
+
 	connectTime := time.Duration(time.Now().UnixNano() - start)
 	logger.Debugf("routerConn[%s@%s] connected in %d ms", routerName, ingressUrl, connectTime.Milliseconds())
 
-	if versionHeader, found := ch.Underlay().Headers()[channel.HelloVersionHeader]; found {
+	if versionHeader, found := ch.Headers()[channel.HelloVersionHeader]; found {
 		versionInfo, err := versions.StdVersionEncDec.Decode(versionHeader)
 		if err != nil {
 			pfxlog.Logger().Errorf("could not parse hello version header: %v", err)
@@ -1438,12 +1495,11 @@ func (context *ContextImpl) connectEdgeRouter(routerName, ingressUrl string) *ed
 
 	logger.Debugf("connected to %s", ingressUrl)
 
-	context.Emit(EventRouterConnected, edgeConn.GetRouterName(), edgeConn.Key())
-
 	useConn := context.routerConnections.Upsert(ingressUrl, edgeConn,
 		func(exist bool, oldV edge.RouterConn, newV edge.RouterConn) edge.RouterConn {
 			if exist { // use the routerConnection already in the map, close new one
 				pfxlog.Logger().Infof("connection to %s already established, closing duplicate connection", ingressUrl)
+
 				go func() {
 					if err := newV.Close(); err != nil {
 						pfxlog.Logger().Errorf("unable to close router connection (%v)", err)
@@ -1467,6 +1523,8 @@ func (context *ContextImpl) connectEdgeRouter(routerName, ingressUrl string) *ed
 						// No traffic on channel, no response. Close the channel
 						logrus.Error("no read traffic on channel since before latency probe was sent, closing channel")
 						_ = ch.Close()
+					} else {
+						h.Update(int64(LatencyCheckTimeout))
 					}
 				},
 				ExitHandler: func() {
@@ -1477,6 +1535,10 @@ func (context *ContextImpl) connectEdgeRouter(routerName, ingressUrl string) *ed
 			go latency.ProbeLatencyConfigurable(latencyProbeConfig)
 			return newV
 		})
+
+	if useConn == edgeConn {
+		context.Emit(EventRouterConnected, edgeConn.GetRouterName(), edgeConn.Key())
+	}
 
 	return &edgeRouterConnResult{
 		routerUrl:        ingressUrl,
@@ -1526,7 +1588,7 @@ func (context *ContextImpl) GetServices() ([]rest_model.ServiceDetail, error) {
 func (context *ContextImpl) GetServiceTerminators(serviceName string, offset, limit int) ([]*rest_model.TerminatorClientDetail, int, error) {
 	svc, found := context.GetService(serviceName)
 	if !found {
-		return nil, 0, errors.Errorf("did not find service named %v", serviceName)
+		return nil, 0, fmt.Errorf("did not find service named %v", serviceName)
 	}
 	return context.CtrlClt.GetServiceTerminators(svc, offset, limit)
 }
@@ -1606,20 +1668,20 @@ func (context *ContextImpl) createSession(service *rest_model.ServiceDetail, ses
 	session, err := context.getOrCreateSession(*service.ID, sessionType)
 	if err != nil {
 		logger.WithError(err).WithField("errorType", fmt.Sprintf("%T", err)).Warnf("failure creating %s session to service %s", sessionType, *service.Name)
-		var target error = &rest_session.CreateSessionUnauthorized{}
-		if errors.As(err, &target) {
+		var createSessionUnauthorized = &rest_session.CreateSessionUnauthorized{}
+		if errors.As(err, &createSessionUnauthorized) {
 			if err := context.Authenticate(); err != nil {
-				target = &authentication.AuthenticateUnauthorized{}
-				if errors.As(err, &target) {
+				var authenticateUnauthorized = &authentication.AuthenticateUnauthorized{}
+				if errors.As(err, &authenticateUnauthorized) {
 					return nil, backoff.Permanent(err)
 				}
 				return nil, err
 			}
 		}
 
-		target = &rest_session.CreateSessionNotFound{}
-		if errors.As(err, &target) {
-			if refreshErr := context.refreshServices(false); refreshErr != nil {
+		var createSessionNotFound = &rest_session.CreateSessionNotFound{}
+		if errors.As(err, &createSessionNotFound) {
+			if refreshErr := context.refreshServices(false, false); refreshErr != nil {
 				logger.WithError(refreshErr).Info("failed to refresh services after create session returned 404 (likely for service)")
 			}
 		}
@@ -1684,6 +1746,9 @@ func (context *ContextImpl) Close() {
 }
 
 func (context *ContextImpl) Metrics() metrics.Registry {
+	if context.metrics == nil {
+		_ = context.Authenticate()
+	}
 	return context.metrics
 }
 
@@ -1694,8 +1759,18 @@ func (context *ContextImpl) EnrollZitiMfa() (*rest_model.DetailMfa, error) {
 func (context *ContextImpl) VerifyZitiMfa(code string) error {
 	return context.CtrlClt.VerifyMfa(code)
 }
+
 func (context *ContextImpl) RemoveZitiMfa(code string) error {
 	return context.CtrlClt.RemoveMfa(code)
+}
+
+func (context *ContextImpl) getXgressEnv() xgress.Env {
+	context.lock.Lock()
+	defer context.lock.Unlock()
+	if context.xgressEnv == nil {
+		context.xgressEnv = NewXgressEnv(context.closeNotify, context.metrics)
+	}
+	return context.xgressEnv
 }
 
 type waitForNHelper struct {
@@ -1731,7 +1806,7 @@ func newListenerManager(service *rest_model.ServiceDetail, context *ContextImpl,
 		var err error
 		keyPair, err = kx.NewKeyPair()
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to create end-to-end encrytpion key-pair while hosting service '%s'", *service.Name)
+			return nil, fmt.Errorf("unable to create end-to-end encrytpion key-pair while hosting service '%s' (%w)", *service.Name, err)
 		}
 	}
 
@@ -1766,12 +1841,12 @@ func newListenerManager(service *rest_model.ServiceDetail, context *ContextImpl,
 
 	if helper != nil {
 		if err := helper.WaitForN(options.ConnectTimeout); err != nil {
-			result := errorz.MultipleErrors{}
-			result = append(result, err)
+			var errList []error
+			errList = append(errList, err)
 			if closeErr := listenerMgr.listener.Close(); closeErr != nil {
-				result = append(result, closeErr)
+				errList = append(errList, closeErr)
 			}
-			return nil, result.ToError()
+			return nil, errors.Join(errList...)
 		}
 	}
 
@@ -1958,7 +2033,7 @@ func (mgr *listenerManager) createListener(routerConnection edge.RouterConn, ses
 	logger := pfxlog.Logger().WithField("serviceName", *mgr.service.Name).
 		WithField("router", routerConnection.GetRouterName())
 	svc := mgr.listener.GetService()
-	listener, err := routerConnection.Listen(svc, session, mgr.options)
+	listener, err := routerConnection.Listen(svc, session, mgr.options, mgr.context.getXgressEnv)
 	elapsed := time.Since(start)
 	if err == nil {
 		logger = logger.WithField("connId", listener.Id())
@@ -2041,15 +2116,15 @@ func (mgr *listenerManager) refreshSession() {
 	session, err := mgr.context.refreshSession(mgr.session)
 
 	if err != nil {
-		var target error = &rest_session.DetailSessionNotFound{}
-		if errors.As(err, &target) {
+		var detailSessionNotFound = &rest_session.DetailSessionNotFound{}
+		if errors.As(err, &detailSessionNotFound) {
 			// try to create new session
 			mgr.createSessionWithBackoff()
 			return
 		}
 
-		target = &rest_session.DetailSessionUnauthorized{}
-		if errors.As(err, &target) {
+		var detailSessionUnauthorized = &rest_session.DetailSessionUnauthorized{}
+		if errors.As(err, &detailSessionUnauthorized) {
 			log.WithError(err).Debugf("failure refreshing bind session for service %v", mgr.listener.GetServiceName())
 			if err := mgr.context.EnsureAuthenticated(mgr.options); err != nil {
 				err := fmt.Errorf("unable to establish API session (%w)", err)
@@ -2062,8 +2137,8 @@ func (mgr *listenerManager) refreshSession() {
 
 		session, err = mgr.context.refreshSession(mgr.session)
 		if err != nil {
-			target = &rest_session.DetailSessionUnauthorized{}
-			if errors.As(err, &target) {
+			detailSessionUnauthorized = &rest_session.DetailSessionUnauthorized{}
+			if errors.As(err, &detailSessionUnauthorized) {
 				log.WithError(err).Errorf(
 					"failure refreshing bind session even after re-authenticating api session. service %v",
 					mgr.listener.GetServiceName())

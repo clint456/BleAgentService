@@ -43,6 +43,7 @@ type SerialQueue interface {
 }
 
 type BLEController interface {
+	Close() error
 	InitializeAsPeripheral() error
 	GetQueue() SerialQueue // 返回串口队列，具体类型由实现决定
 }

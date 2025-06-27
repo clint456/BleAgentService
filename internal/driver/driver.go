@@ -68,9 +68,9 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	if d.Config == nil || d.BleController == nil || d.MessageBusClient == nil {
 		return fmt.Errorf("依赖未注入")
 	}
-
-	d.logger.Info("BLE代理服务初始化完成")
-	d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown) // 转发下行数据
+	if err := d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown); err != nil { // 转发下行数据
+		d.logger.Errorf("【透明代理（↓）】 订阅下行总线失败 err: %v", err)
+	}
 	return nil
 }
 

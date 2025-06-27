@@ -68,13 +68,22 @@ type APISessionDetail struct {
 	// Required: true
 	IdentityID *string `json:"identityId"`
 
+	// improper client cert chain
+	ImproperClientCertChain bool `json:"improperClientCertChain,omitempty"`
+
 	// ip address
 	// Required: true
 	IPAddress *string `json:"ipAddress"`
 
+	// is cert extend requested
+	IsCertExtendRequested bool `json:"isCertExtendRequested,omitempty"`
+
 	// is cert extendable
 	// Required: true
 	IsCertExtendable *bool `json:"isCertExtendable"`
+
+	// is cert key roll requested
+	IsCertKeyRollRequested bool `json:"isCertKeyRollRequested,omitempty"`
 
 	// is mfa complete
 	// Required: true
@@ -116,9 +125,15 @@ func (m *APISessionDetail) UnmarshalJSON(raw []byte) error {
 
 		IdentityID *string `json:"identityId"`
 
+		ImproperClientCertChain bool `json:"improperClientCertChain,omitempty"`
+
 		IPAddress *string `json:"ipAddress"`
 
+		IsCertExtendRequested bool `json:"isCertExtendRequested,omitempty"`
+
 		IsCertExtendable *bool `json:"isCertExtendable"`
+
+		IsCertKeyRollRequested bool `json:"isCertKeyRollRequested,omitempty"`
 
 		IsMfaComplete *bool `json:"isMfaComplete"`
 
@@ -144,9 +159,15 @@ func (m *APISessionDetail) UnmarshalJSON(raw []byte) error {
 
 	m.IdentityID = dataAO1.IdentityID
 
+	m.ImproperClientCertChain = dataAO1.ImproperClientCertChain
+
 	m.IPAddress = dataAO1.IPAddress
 
+	m.IsCertExtendRequested = dataAO1.IsCertExtendRequested
+
 	m.IsCertExtendable = dataAO1.IsCertExtendable
+
+	m.IsCertKeyRollRequested = dataAO1.IsCertKeyRollRequested
 
 	m.IsMfaComplete = dataAO1.IsMfaComplete
 
@@ -181,9 +202,15 @@ func (m APISessionDetail) MarshalJSON() ([]byte, error) {
 
 		IdentityID *string `json:"identityId"`
 
+		ImproperClientCertChain bool `json:"improperClientCertChain,omitempty"`
+
 		IPAddress *string `json:"ipAddress"`
 
+		IsCertExtendRequested bool `json:"isCertExtendRequested,omitempty"`
+
 		IsCertExtendable *bool `json:"isCertExtendable"`
+
+		IsCertKeyRollRequested bool `json:"isCertKeyRollRequested,omitempty"`
 
 		IsMfaComplete *bool `json:"isMfaComplete"`
 
@@ -206,9 +233,15 @@ func (m APISessionDetail) MarshalJSON() ([]byte, error) {
 
 	dataAO1.IdentityID = m.IdentityID
 
+	dataAO1.ImproperClientCertChain = m.ImproperClientCertChain
+
 	dataAO1.IPAddress = m.IPAddress
 
+	dataAO1.IsCertExtendRequested = m.IsCertExtendRequested
+
 	dataAO1.IsCertExtendable = m.IsCertExtendable
+
+	dataAO1.IsCertKeyRollRequested = m.IsCertKeyRollRequested
 
 	dataAO1.IsMfaComplete = m.IsMfaComplete
 

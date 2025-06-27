@@ -57,3 +57,11 @@ func (c *BLEController) InitializeAsPeripheral() error {
 func (c *BLEController) GetQueue() interfaces.SerialQueue {
 	return c.Queue
 }
+
+func (c *BLEController) Close() error {
+	err := c.Queue.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}

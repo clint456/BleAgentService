@@ -123,9 +123,12 @@ func (b *HttpServer) BootstrapHandler(
 		return false
 	}
 
-	b.router.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
-		Timeout: timeout,
-	}))
+	if timeout > 0 {
+		// Apply timeout middleware only when timeout is set
+		b.router.Use(middleware.TimeoutWithConfig(middleware.TimeoutConfig{
+			Timeout: timeout,
+		}))
+	}
 
 	b.router.Use(RequestLimitMiddleware(bootstrapConfig.Service.MaxRequestSize, lc))
 
@@ -159,7 +162,7 @@ func (b *HttpServer) BootstrapHandler(
 		}()
 
 		b.isRunning = true
-		err = zerotrust.ListenOnMode(bootstrapConfig, b.serverKey, addr, t, server, dic)
+		err := zerotrust.ListenOnMode(bootstrapConfig, b.serverKey, addr, t, server, dic)
 
 		// "Server closed" error occurs when Shutdown above is called in the Done processing, so it can be ignored
 		if err != nil && err != http.ErrServerClosed {

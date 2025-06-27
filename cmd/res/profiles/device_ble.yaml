@@ -1,32 +1,46 @@
-name: "Uart-Ble-Device"
+name: "device-ble"
 manufacturer: "edgex"
-model: "ble-agent-service"
+model: "device-ble"
 labels:
 - "ble-agent-service-example"
 description: "Example of ble-agent-service"
 
 deviceResources:
 -
-    name: "String"
+    name: "GetVERSION"
     isHidden: false
-    description: "Read/Write string from/to the UART device"
-    attributes: { type: "generic", maxbytes: 160, timeout: 1}
+    description: "Get VERSION"
+    attributes: { type: "ble", timeout: 1000}
     properties:
         valueType: "String"
-        readWrite: "RW"
+        readWrite: "R"
 -
-    name: "Int8"
+    name: "GetBLEADDR"
     isHidden: false
-    description: "Read/Write int8 from/to the UART device"
-    attributes: { type: "generic", maxbytes: 160, timeout: 1}
+    description: "Get VERSION"
+    attributes: { type: "ble", timeout: 1000}
     properties:
-        valueType: "Int8"
-        readWrite: "RW"
+        valueType: "String"
+        readWrite: "R"
 -
-    name: "Int16"
+    name: "Setting&&PeripheralInit"
     isHidden: false
-    description: "Read/Write int16 from/to the UART devic"
-    attributes: { type: "generic", maxbytes: 160, timeout: 1}
+    description: "BLE Setting and Peripheral init{bleName:<string>,TxPower:<int>}"
     properties:
-        valueType: "Int16"
-        readWrite: "RW"
+      valueType: "ObjectArray"
+      readWrite: "W"
+      defaultValue: '[{"key1": "value1", "key2": 123}, {"key1": "value2", "key2": 456}]'
+
+-
+    name: "SendString"
+    isHidden: false
+    description: "Set TXPOWER"
+    attributes: { type: "ble", timeout: 1000}
+    properties:
+        valueType: "String"
+        readWrite: "W"
+
+
+
+
+
