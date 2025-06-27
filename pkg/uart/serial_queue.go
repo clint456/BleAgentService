@@ -12,18 +12,18 @@ import (
 
 // SerialQueue 串口命令队列管理器，用于管理串口命令的发送和响应处理。
 type SerialQueue struct {
-	serialPort      SerialPortInterface           // 串口操作接口
-	requestCh       chan interfaces.SerialRequest // 命令请求队列通道
-	pendingRequests []interfaces.SerialRequest    // 待处理请求，按顺序存储
-	commandCallback func(string)                  // 异步命令消息回调函数
-	upAgentCallback func(string)                  // 异步透明代理回调函数
-	stopCh          chan struct{}                 // 停止信号通道
-	logger          logger.LoggingClient          // 日志记录器
-	readerCh        chan string                   // 串口读取数据的通用管道
+	serialPort      interfaces.SerialPortInterface // 串口操作接口
+	requestCh       chan interfaces.SerialRequest  // 命令请求队列通道
+	pendingRequests []interfaces.SerialRequest     // 待处理请求，按顺序存储
+	commandCallback func(string)                   // 异步命令消息回调函数
+	upAgentCallback func(string)                   // 异步透明代理回调函数
+	stopCh          chan struct{}                  // 停止信号通道
+	logger          logger.LoggingClient           // 日志记录器
+	readerCh        chan string                    // 串口读取数据的通用管道
 }
 
 // NewSerialQueue 创建新的串口队列管理器并启动后台处理协程。
-func NewSerialQueue(port SerialPortInterface, logger logger.LoggingClient, ccb, uacb func(string), queueSize int) *SerialQueue {
+func NewSerialQueue(port interfaces.SerialPortInterface, logger logger.LoggingClient, ccb, uacb func(string), queueSize int) *SerialQueue {
 	if queueSize <= 0 {
 		queueSize = 10 // 默认容量 10
 	}
@@ -236,4 +236,8 @@ func (q *SerialQueue) Close() error {
 	close(q.readerCh)
 	q.logger.Infof("串口队列管理器已关闭")
 	return nil
+}
+
+func (q *SerialQueue) GetPort() interfaces.SerialPortInterface {
+	return q.serialPort
 }

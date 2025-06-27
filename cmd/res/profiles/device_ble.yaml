@@ -25,11 +25,11 @@ deviceResources:
 -
     name: "Setting&&PeripheralInit"
     isHidden: false
-    description: "BLE Setting and Peripheral init{bleName:<string>,TxPower:<int>}"
+    description: "BLE Setting and Peripheral init{BleName:<string>,TxPower:<int>}"
+    attributes: { type: "ble", timeout: 1000}
     properties:
-      valueType: "ObjectArray"
+      valueType: "Object"
       readWrite: "W"
-      defaultValue: '[{"key1": "value1", "key2": 123}, {"key1": "value2", "key2": 456}]'
 
 -
     name: "SendString"

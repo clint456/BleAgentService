@@ -21,7 +21,14 @@ type SerialResponse struct {
 	Error error  // 错误信息（如超时、模块错误等）
 }
 
-type SerialQueue interface {
+// SerialPortInterface 定义 SerialQueue 所依赖的串口接口
+type SerialPortInterface interface {
+	Write([]byte) (int, error)
+	ReadLine() (string, error)
+	Close() error
+}
+
+type SerialQueueInterface interface {
 	// SendCommand 发送串口命令并等待设备响应。支持并发发送
 	//
 	// 参数:
@@ -39,11 +46,13 @@ type SerialQueue interface {
 	//   - "请求队列已满": 如果在 queueTimeout 时间内无法将请求放入队列（最多重试 3 次）。
 	//   - "等待响应超时": 如果在 readDelay + timeout 时间内未收到设备响应。
 	SendCommand(command []byte, timeout, readDelay, queueTimeout time.Duration) (string, error)
+	GetPort() SerialPortInterface
 	Close() error
 }
 
 type BLEController interface {
 	Close() error
 	InitializeAsPeripheral() error
-	GetQueue() SerialQueue // 返回串口队列，具体类型由实现决定
+	CustomInitializeBle(cmd []string) error
+	GetQueue() SerialQueueInterface // 返回串口队列，具体类型由实现决定
 }

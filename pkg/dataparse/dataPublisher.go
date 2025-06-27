@@ -24,7 +24,7 @@ func PublishToMessageBus(client interfaces.MessageBusClient, data interface{}, t
 func SendToBlE(controller interfaces.BLEController, data interface{}) error {
 	if controller != nil {
 		queueIface := controller.GetQueue()
-		if queue, ok := queueIface.(interfaces.SerialQueue); ok {
+		if queue, ok := queueIface.(interfaces.SerialQueueInterface); ok {
 			if err := ble.SendJSONOverBLE(queue, data); err == nil {
 				return nil
 			} else {
