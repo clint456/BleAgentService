@@ -68,3 +68,7 @@ func (e *EdgexMessageBusClient) Request(topic string, data interface{}) (types.M
 func (e *EdgexMessageBusClient) SetTimeout(timeout time.Duration) {
 	e.client.SetTimeout(timeout)
 }
+
+func (e *EdgexMessageBusClient) Disconnect() error {
+	return e.client.Disconnect()
+}

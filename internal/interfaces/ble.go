@@ -54,5 +54,7 @@ type BLEController interface {
 	Close() error
 	InitializeAsPeripheral() error
 	CustomInitializeBle(cmd []string) error
+	SendSingle(cmd string) error
+	SendMulti(cmds []string) error
 	GetQueue() SerialQueueInterface // 返回串口队列，具体类型由实现决定
 }

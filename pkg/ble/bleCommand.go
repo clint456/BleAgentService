@@ -47,13 +47,21 @@ func GetVersion() string {
 }
 
 // SetBaud 生成设置串口波特率的 AT 命令
-func SetBaud(baud int) (string, error) {
+func SetBaud(baud int64) (string, error) {
 	// 验证波特率有效性
-	validBauds := map[int]bool{9600: true, 19200: true, 38400: true, 57600: true, 115200: true}
+	validBauds := map[int64]bool{9600: true, 19200: true, 38400: true, 57600: true, 115200: true, 230400: true, 460800: true, 921600: true}
 	if !validBauds[baud] {
 		return "", fmt.Errorf("invalid baud rate: %d, supported: %v", baud, validBauds)
 	}
 	return fmt.Sprintf("AT+QSETBAUD=%d\r\n", baud), nil
+}
+
+// SetTxPower 生成发送功率，限制值的大小
+func SetTxPower(txpower int8) (string, error) {
+	if txpower > 10 || txpower < -16 {
+		return "", fmt.Errorf("txpower setting value out of range [-16,10]")
+	}
+	return fmt.Sprintf("AT+QTXPOWER=%d\r\n", txpower), nil
 }
 
 // --- BLE 初始化与配置 ---
@@ -117,15 +125,12 @@ func FinishGATTServer() string {
 }
 
 // SendNotify 生成发送 Notify 通知的 AT 命令
-func SendNotify(connIdx, handle int, value string) (string, error) {
-	if connIdx < 0 {
-		return "", fmt.Errorf("invalid connection index: %d", connIdx)
-	}
-	if handle <= 0 {
-		return "", fmt.Errorf("invalid handle: %d", handle)
+func SendNotify(handle string, value string) (string, error) {
+	if handle <= "" {
+		return "", fmt.Errorf("invalid handle: %s", handle)
 	}
 	if value == "" {
 		return "", fmt.Errorf("value cannot be empty")
 	}
-	return fmt.Sprintf("AT+QBLEGATTSNTFY=%d,%d,%s\r\n", connIdx, handle, value), nil
+	return fmt.Sprintf("AT+QBLEGATTSNTFY=0,%s,%s\r\n", handle, value), nil
 }

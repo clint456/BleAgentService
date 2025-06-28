@@ -25,7 +25,7 @@ deviceResources:
 -
     name: "Setting&&PeripheralInit"
     isHidden: false
-    description: "BLE Setting and Peripheral init{BleName:<string>,TxPower:<int>}"
+    description: "BLE Setting and Peripheral Init, e.g., {BleName:<string>}"
     attributes: { type: "ble", timeout: 1000}
     properties:
       valueType: "Object"
@@ -34,10 +34,28 @@ deviceResources:
 -
     name: "SendString"
     isHidden: false
-    description: "Set TXPOWER"
+    description: "Send String"
     attributes: { type: "ble", timeout: 1000}
     properties:
         valueType: "String"
+        readWrite: "W"
+
+-
+    name: "SetTxPower"
+    isHidden: false
+    description: "Set TXPOWER"
+    attributes: { type: "ble", timeout: 1000}
+    properties:
+        valueType: "Int8"
+        readWrite: "W"
+
+-
+    name: "SetBaud"
+    isHidden: false
+    description: "Set SetBaud"
+    attributes: { type: "ble", timeout: 1000}
+    properties:
+        valueType: "Int64"
         readWrite: "W"
 
 

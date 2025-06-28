@@ -15,4 +15,5 @@ type MessageBusClient interface {
 	Request(topic string, data interface{}) (types.MessageEnvelope, error)
 	SubscribeResponse(topic string) error
 	SetTimeout(timeout time.Duration)
+	Disconnect() error
 }

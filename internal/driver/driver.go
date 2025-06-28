@@ -90,7 +90,6 @@ func (d *Driver) HandleUpCommandCallback(cmd string) {
 
 // Start 启动设备服务。
 func (d *Driver) Start() error {
-
 	return nil
 }
 
@@ -142,8 +141,8 @@ func (d *Driver) Stop(force bool) error {
 
 	// 关闭MessageBus客户端
 	if d.MessageBusClient != nil {
-		if closer, ok := d.MessageBusClient.(interface{ Close() error }); ok {
-			err := closer.Close()
+		if closer, ok := d.MessageBusClient.(interface{ Disconnect() error }); ok {
+			err := closer.Disconnect()
 			if err != nil {
 				d.logger.Errorf("MessageBus客户端关闭失败: %v", err)
 			} else {

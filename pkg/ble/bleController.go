@@ -84,3 +84,45 @@ func (c *BLEController) Close() error {
 	}
 	return nil
 }
+
+// 向BLE发送一条数据（MTU小于247)
+func (c *BLEController) SendSingle(cmd string) error {
+	response, err := c.Queue.SendCommand([]byte(cmd), 2*time.Second, 1*time.Second, 100*time.Millisecond)
+	if err != nil {
+		c.logger.Errorf("❌发送%v, 出现错误 :%v, response:%v", cmd, err, response)
+		return err
+	} else {
+		if strings.Contains(response, "OK") {
+			c.logger.Infof("✅ 发送 %q 成功, 回显： %v", cmd, response)
+		} else if strings.Contains(response, "ERROR") {
+			c.logger.Errorf("⛔️  发送 %q 失败: %q , 回显： %v ", cmd, err, response)
+		} else {
+			c.logger.Warnf("❗❓  未知回显, response:%v", response)
+		}
+	}
+	c.logger.Info("BLE 单条指令发送成功")
+	return nil
+}
+
+// 多条指令（单条指令MTU小于247)
+// 如果需要发送JSON数据请使用jsonSender中的方法
+func (c *BLEController) SendMulti(cmds []string) error {
+	for _, cmd := range cmds {
+		response, err := c.Queue.SendCommand([]byte(cmd), 2*time.Second, 1*time.Second, 100*time.Millisecond)
+		if err != nil {
+			c.logger.Errorf("❌发送%v, 出现错误 :%v, response:%v", cmd, err, response)
+			return err
+		} else {
+			if strings.Contains(response, "OK") {
+				c.logger.Infof("✅ 发送 %q 成功, 回显： %v", cmd, response)
+			} else if strings.Contains(response, "ERROR") {
+				c.logger.Errorf("⛔️  发送 %q 失败: %q , 回显： %v ", cmd, err, response)
+			} else {
+				c.logger.Warnf("❗❓  未知回显, response:%v", response)
+			}
+		}
+	}
+
+	c.logger.Info("BLE 多条指令发送成功")
+	return nil
+}
