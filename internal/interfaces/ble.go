@@ -46,6 +46,7 @@ type SerialQueueInterface interface {
 	//   - "请求队列已满": 如果在 queueTimeout 时间内无法将请求放入队列（最多重试 3 次）。
 	//   - "等待响应超时": 如果在 readDelay + timeout 时间内未收到设备响应。
 	SendCommand(command []byte, timeout, readDelay, queueTimeout time.Duration) (string, error)
+	GetResponse(timeout time.Duration) (string, error)
 	GetPort() SerialPortInterface
 	Close() error
 }
@@ -56,5 +57,6 @@ type BLEController interface {
 	CustomInitializeBle(cmd []string) error
 	SendSingle(cmd string) error
 	SendMulti(cmds []string) error
+	SendSingleWithResponse(cmd string) (res string, err error)
 	GetQueue() SerialQueueInterface // 返回串口队列，具体类型由实现决定
 }

@@ -90,6 +90,27 @@ WaitResponse:
 	}
 }
 
+// GetResponse 读取串口中的一条响应数据，不发送任何命令。
+// 参数:
+//   - timeout: 最长等待数据的时间（纳秒）
+//
+// 返回:
+//   - string: 串口读取到的数据（通常是一整行）
+//   - error: 超时或读取错误
+func (q *SerialQueue) GetResponse(timeout time.Duration) (string, error) {
+	if q.readerCh == nil {
+		return "", fmt.Errorf("读取通道未初始化")
+	}
+
+	select {
+	case line := <-q.readerCh:
+		q.logger.Debugf("收到串口数据: %s", line)
+		return line, nil
+	case <-time.After(timeout):
+		return "", fmt.Errorf("串口读取超时（%s 内无数据）", timeout)
+	}
+}
+
 // processRequests 后台协程，串行处理所有命令请求。
 // 从 requestCh 读取请求，写入串口命令，并将成功写入的请求加入 pendingRequests 等待响应。
 func (q *SerialQueue) processRequests() {
@@ -211,8 +232,8 @@ func (q *SerialQueue) startReaderLoop() {
 func (q *SerialQueue) isTerminal(line string) bool {
 	return strings.Contains(line, "OK") ||
 		strings.Contains(line, "ERROR") ||
-		strings.Contains(line, "+QBLEGATTSNTFY") ||
-		strings.Contains(line, "+CME ERROR")
+		strings.Contains(line, "+QVERSION") ||
+		strings.Contains(line, "+QBLEADDR")
 }
 
 // Close 关闭串口队列管理器，停止后台协程并清理资源。

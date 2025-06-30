@@ -8,6 +8,7 @@ import (
 	blecommand "device-ble/pkg/ble"
 
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
+	"github.com/edgexfoundry/go-mod-core-contracts/v4/common"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
 )
 
@@ -18,21 +19,43 @@ import (
 // 获取蓝牙的固件版本号 AT+QVERSION
 // 本机 BLE MAC 地址 AT+QBLEADDR?
 // 蓝牙的广播参数   AT+QBLEADVPARAM?
-func (d *Driver) HandleReadCommands(deviceName string, protocols map[string]models.ProtocolProperties, reqs []dsModels.CommandRequest) (res []*dsModels.CommandValue, err error) {
-	d.logger.Debugf("处理设备 %s 的读取命令", deviceName)
-	// TODO: 实现UI具体的读取逻辑
-	fmt.Printf("deviceName: \n\t%s,\nprotocols: \n\t%v,\n reqs:\t%v,\n ", deviceName, protocols, reqs)
-	res = make([]*dsModels.CommandValue, len(reqs))
+func (d *Driver) HandleReadCommands(
+	deviceName string,
+	protocols map[string]models.ProtocolProperties,
+	reqs []dsModels.CommandRequest,
+) (responses []*dsModels.CommandValue, err error) {
+	d.logger.Debugf("处理设备 [%s] 的读取命令", deviceName)
+	d.logger.Debugf("协议信息: %+v", protocols)
+	d.logger.Debugf("读取请求列表: %+v", reqs)
 
-	for i, req := range reqs {
-		if dr, ok := d.sdk.DeviceResource(deviceName, req.DeviceResourceName); ok {
-			fmt.Printf("第 %d 个 dsresource: \n\t%v\n ", i, dr)
+	// 初始化返回结果列表
+	responses = make([]*dsModels.CommandValue, 0, len(reqs))
 
-		} else {
-			return nil, fmt.Errorf("cannot find device resource %s from device %s in cache", req.DeviceResourceName, deviceName)
+	// 遍历每个请求，根据资源名称生成对应的 CommandValue
+	for _, req := range reqs {
+		var (
+			cv *dsModels.CommandValue
+		)
+
+		switch req.DeviceResourceName {
+		case "GetVERSION":
+			res, err := d.BleController.SendSingleWithResponse(blecommand.GetVersion())
+			if err != nil {
+				return nil, err
+			}
+			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, common.ValueTypeString, res)
+		case "GetBLEADDR":
+			res, err := d.BleController.SendSingleWithResponse(blecommand.QueryAddress())
+			if err != nil {
+				return nil, err
+			}
+			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, common.ValueTypeString, res)
+
 		}
+		responses = append(responses, cv)
 	}
-	return nil, fmt.Errorf("读取命令暂未实现")
+
+	return responses, nil
 }
 
 // HandleWriteCommands 处理写入命令。
@@ -48,7 +71,7 @@ func (d *Driver) HandleWriteCommands(deviceName string, protocols map[string]mod
 	return nil
 }
 
-// handleWrite 对命令进行分类处理
+// handleWrite 对set命令进行分类处理
 func (d *Driver) handleWrite(param *dsModels.CommandValue, ble interfaces.BLEController) error {
 	switch param.DeviceResourceName {
 	case "Setting&&PeripheralInit":
