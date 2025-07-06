@@ -183,11 +183,11 @@ func (q *SerialQueue) startReaderLoop() {
 					continue
 				}
 				line = strings.Trim(line, "\r\n")
-				if line == "" || strings.Contains(line, "freqchip") {
+				if line == "" || strings.Contains(line, "freqchip") { //跳过蓝牙回显非法的字符
 					continue
 				}
 				q.logger.Debugf("收到串口数据: %s", line)
-				if strings.Contains(line, "+COMMAND:") {
+				if strings.Contains(line, "+COMMAND:") { //处理终端运维命令控制回调
 					lines := strings.Split(line, "+COMMAND:")
 					for _, part := range lines {
 						if part == "" {
@@ -199,28 +199,37 @@ func (q *SerialQueue) startReaderLoop() {
 					}
 					continue
 				}
-				if q.upAgentCallback != nil {
-					go q.upAgentCallback(line)
-				}
-				// 按顺序匹配最早的待处理请求
-				if len(q.pendingRequests) > 0 && q.isTerminal(line) {
-					req := q.pendingRequests[0]
-					// 应用 DelayBeforeRead
-					if req.DelayBeforeRead > 0 {
-						time.Sleep(req.DelayBeforeRead)
-						q.logger.Debugf("应用读取延迟: %v, 命令: %s", req.DelayBeforeRead, string(req.Command))
-					}
-					resp := interfaces.SerialResponse{Data: line}
-					if strings.Contains(line, "ERROR") {
-						resp.Error = fmt.Errorf("命令执行失败: %s", line)
-					}
-					select {
-					case req.ResponseCh <- resp:
-						q.logger.Debugf("响应发送成功，命令: %s, 数据: %s", string(req.Command), line)
-						q.pendingRequests = q.pendingRequests[1:] // 移除已处理请求
-					default:
-						q.logger.Warnf("响应通道已满，命令: %s", string(req.Command))
+				if q.isTerminal(line) {
+					if len(q.pendingRequests) > 0 {
+						req := q.pendingRequests[0]
+
+						// 应用 DelayBeforeRead
+						if req.DelayBeforeRead > 0 {
+							time.Sleep(req.DelayBeforeRead)
+							q.logger.Debugf("应用读取延迟: %v, 命令: %s", req.DelayBeforeRead, string(req.Command))
+						}
+
+						resp := interfaces.SerialResponse{Data: line}
+						if strings.Contains(line, "ERROR") {
+							resp.Error = fmt.Errorf("命令执行失败: %s", line)
+						}
+
+						select {
+						case req.ResponseCh <- resp:
+							q.logger.Debugf("响应发送成功，命令: %s, 数据: %s", string(req.Command), line)
+						default:
+							q.logger.Warnf("响应通道已满，命令: %s", string(req.Command))
+						}
+
+						// 无论是否发送成功，都移除请求
 						q.pendingRequests = q.pendingRequests[1:]
+					} else {
+						// 收到终止响应但没有挂起请求
+						q.logger.Warnf("收到意外终止响应: %s，但无挂起请求", line)
+					}
+				} else {
+					if q.upAgentCallback != nil {
+						go q.upAgentCallback(line)
 					}
 				}
 			}
@@ -228,7 +237,7 @@ func (q *SerialQueue) startReaderLoop() {
 	}()
 }
 
-// isTerminal 判断是否为终止响应（OK/ERROR/+QBLEGATTSNTFY/其他）。
+// isTerminal 用于判断是不是请求的响应
 func (q *SerialQueue) isTerminal(line string) bool {
 	return strings.Contains(line, "OK") ||
 		strings.Contains(line, "ERROR") ||

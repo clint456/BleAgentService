@@ -58,7 +58,14 @@ deviceResources:
         valueType: "Int64"
         readWrite: "W"
 
-
+# deviceCommands:
+#   -
+#     name: "GetCMD"
+#     isHidden: false
+#     readWrite: "R"
+#     resourceOperations:
+#       - { deviceResource: "GetVERSION", defaultValue: "0.0" }
+#       - { deviceResource: "GetBLEADDR", defaultValue: "0.0.0.0" }
 
 
 

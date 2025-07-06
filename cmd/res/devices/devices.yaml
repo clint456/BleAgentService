@@ -11,7 +11,7 @@ deviceList:
         deviceLocation: "/dev/ttyS3"
         baudRate: 115200
     # autoEvents:
-    #   - Interval: 20s
-    #     OnChange: false
-    #     SourceName: Read_Cmd
+    #   - interval: 5s
+    #     onChange: false
+    #     sourceName: GetVERSION
 

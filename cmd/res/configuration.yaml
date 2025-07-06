@@ -5,7 +5,10 @@ Service:
   Host: localhost
   Port: 59995
   StartupMsg: ble-agent-service started
-
+Telemetry:
+  Metrics: 
+    # All service's custom metric names must be present in this list. All common metric names are in the Common Config
+    ReadCommandsExecuted: true
 Device:
   # These have common values (currently), but must be here for service local env overrides to apply when customized
   ProfilesDir: "./res/profiles"

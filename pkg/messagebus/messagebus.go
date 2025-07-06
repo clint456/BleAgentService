@@ -24,6 +24,9 @@ type Client struct {
 	stopChan      chan struct{}              // 停止所有处理器的控制通道
 	wg            sync.WaitGroup             // 等待所有 goroutine 正常退出
 	responseChMap sync.Map                   // RequestID -> 响应通道，用于匹配响应
+	subscribedMu  sync.Mutex                 // 订阅响应的互斥锁
+	subscribedRes bool                       // 是否已订阅响应标志
+	handledReqID  sync.Map                   // string -> struct{}{}，标记已处理
 	timeout       time.Duration              // 请求-响应超时时间
 }
 
@@ -81,12 +84,10 @@ func NewClient(config Config, lc logger.LoggingClient) (*Client, error) {
 	}, nil
 }
 
-// SetTimeout 设置默认请求响应超时时间。
 func (c *Client) SetTimeout(timeout time.Duration) {
 	c.timeout = timeout
 }
 
-// Connect 建立与消息总线的连接。
 func (c *Client) Connect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -100,7 +101,6 @@ func (c *Client) Connect() error {
 	return nil
 }
 
-// Disconnect 断开连接并停止所有订阅处理器。
 func (c *Client) Disconnect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -116,14 +116,12 @@ func (c *Client) Disconnect() error {
 	return nil
 }
 
-// IsConnected 返回当前连接状态。
 func (c *Client) IsConnected() bool {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return c.isConnected
 }
 
-// Publish 直接向指定主题发布消息（不带响应能力）。
 func (c *Client) Publish(topic string, data interface{}) error {
 	if !c.IsConnected() {
 		return fmt.Errorf("MessageBus 未连接")
@@ -138,16 +136,14 @@ func (c *Client) Publish(topic string, data interface{}) error {
 	return c.client.Publish(message, topic)
 }
 
-// Request 发送带 RequestID 的请求并等待响应，适用于 RPC 风格通信。
 func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope, error) {
 	if !c.IsConnected() {
 		return types.MessageEnvelope{}, fmt.Errorf("MessageBus 未连接")
 	}
 
 	reqID := uuid.NewString()
-	respCh := make(chan types.MessageEnvelope, 100)
+	respCh := make(chan types.MessageEnvelope, 1)
 	c.responseChMap.Store(reqID, respCh)
-	defer c.responseChMap.Delete(reqID)
 
 	message := types.MessageEnvelope{
 		Versionable:   commonDTO.NewVersionable(),
@@ -158,6 +154,7 @@ func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope,
 	}
 
 	if err := c.client.Publish(message, topic); err != nil {
+		c.responseChMap.Delete(reqID)
 		return types.MessageEnvelope{}, err
 	}
 
@@ -165,11 +162,15 @@ func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope,
 	case resp := <-respCh:
 		return resp, nil
 	case <-time.After(c.timeout):
+		c.lc.Warnf("请求超时: %s", reqID)
+		go func(id string) {
+			time.Sleep(2 * time.Second)
+			c.responseChMap.Delete(id)
+		}(reqID)
 		return types.MessageEnvelope{}, fmt.Errorf("请求超时: %s", reqID)
 	}
 }
 
-// Subscribe 订阅普通主题并提供消息处理函数。
 func (c *Client) Subscribe(topic string, handler MessageHandler) error {
 	if !c.IsConnected() {
 		return fmt.Errorf("MessageBus 未连接")
@@ -186,11 +187,18 @@ func (c *Client) Subscribe(topic string, handler MessageHandler) error {
 	return nil
 }
 
-// SubscribeResponse 订阅响应主题，自动将响应分发到对应请求通道。
 func (c *Client) SubscribeResponse(topic string) error {
 	if !c.IsConnected() {
 		return fmt.Errorf("MessageBus 未连接")
 	}
+
+	c.subscribedMu.Lock()
+	defer c.subscribedMu.Unlock()
+	if c.subscribedRes {
+		c.lc.Infof("响应主题 %s 已订阅，跳过重复订阅", topic)
+		return nil
+	}
+
 	topicChannel := types.TopicChannel{
 		Topic:    topic,
 		Messages: make(chan types.MessageEnvelope, 100),
@@ -198,12 +206,13 @@ func (c *Client) SubscribeResponse(topic string) error {
 	if err := c.client.Subscribe([]types.TopicChannel{topicChannel}, c.errorChan); err != nil {
 		return err
 	}
+
+	c.subscribedRes = true
 	c.wg.Add(1)
 	go c.handleResponseMessages(topic, topicChannel.Messages)
 	return nil
 }
 
-// handleMessages 是普通订阅主题的处理逻辑。
 func (c *Client) handleMessages(topic string, ch chan types.MessageEnvelope, handler MessageHandler) {
 	defer c.wg.Done()
 	for {
@@ -226,7 +235,6 @@ func (c *Client) handleMessages(topic string, ch chan types.MessageEnvelope, han
 	}
 }
 
-// handleResponseMessages 专门处理响应类型消息，根据 RequestID 分发到等待通道。
 func (c *Client) handleResponseMessages(topic string, ch chan types.MessageEnvelope) {
 	defer c.wg.Done()
 	for {
@@ -235,13 +243,32 @@ func (c *Client) handleResponseMessages(topic string, ch chan types.MessageEnvel
 			if !ok {
 				return
 			}
-			if respChAny, ok := c.responseChMap.Load(msg.RequestID); ok {
-				if respCh, ok := respChAny.(chan types.MessageEnvelope); ok {
-					respCh <- msg
-					continue
-				}
+			if _, handled := c.handledReqID.LoadOrStore(msg.RequestID, struct{}{}); handled {
+				c.lc.Debugf("重复响应已处理: %s", msg.RequestID)
+				continue
 			}
-			c.lc.Warnf("未匹配的响应: %s", msg.RequestID)
+
+			val, exists := c.responseChMap.Load(msg.RequestID)
+			if !exists {
+				c.lc.Debugf("未匹配的响应: %s（可能已超时）", msg.RequestID)
+				continue
+			}
+
+			respCh, ok := val.(chan types.MessageEnvelope)
+			if !ok {
+				c.lc.Errorf("响应通道类型错误: %s", msg.RequestID)
+				c.responseChMap.Delete(msg.RequestID)
+				continue
+			}
+
+			select {
+			case respCh <- msg:
+				// 成功发送，不立即删除
+			default:
+				c.lc.Warnf("响应通道已满: %s", msg.RequestID)
+				c.responseChMap.Delete(msg.RequestID)
+			}
+
 		case <-c.stopChan:
 			return
 		}

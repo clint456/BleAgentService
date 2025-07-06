@@ -3,22 +3,10 @@ package dataparse
 import (
 	"device-ble/internal/interfaces"
 	"device-ble/pkg/ble"
-	"encoding/json"
 	"fmt"
 )
 
 // PublishToMessageBus 发布数据到MessageBus。
-func PublishToMessageBus(client interfaces.MessageBusClient, data interface{}, topic string) error {
-	dataBytes, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("序列化数据失败: %v", err)
-	}
-	err = client.Publish(topic, dataBytes)
-	if err != nil {
-		return fmt.Errorf("发布到MessageBus失败: %v", err)
-	}
-	return nil
-}
 
 // SendToBlE 异步传输到蓝牙发送器。
 func SendToBlE(controller interfaces.BLEController, data interface{}) error {

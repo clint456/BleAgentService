@@ -69,7 +69,7 @@ func SetTxPower(txpower int8) (string, error) {
 // Init 生成初始化 BLE 栈的 AT 命令
 func Init(role int) (string, error) {
 	// 验证角色有效性
-	validRoles := map[int]bool{1: true, 2: true, 4: true} // Peripheral=1, Central=2, Multi-role=4
+	validRoles := map[int]bool{1: true, 2: true, 4: true} // Peripheral=2, Central=1, Multi-role=4
 	if !validRoles[role] {
 		return "", fmt.Errorf("invalid BLE role: %d, supported: %v", role, validRoles)
 	}
