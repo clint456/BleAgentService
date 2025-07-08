@@ -25,7 +25,6 @@ import (
 	"device-ble/cmd/config"
 	internalif "device-ble/internal/interfaces"
 	"log"
-	"time"
 
 	"device-ble/pkg/ble"
 	"device-ble/pkg/dataparse"
@@ -34,13 +33,15 @@ import (
 	errorDefault "errors"
 	"fmt"
 	"sync"
+	"time"
+
+	"github.com/spf13/cast"
 
 	edgexif "github.com/edgexfoundry/device-sdk-go/v4/pkg/interfaces"
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
-	"github.com/spf13/cast"
 	"github.com/tarm/serial"
 )
 
@@ -64,77 +65,16 @@ type Driver struct {
 	commandResponses sync.Map
 }
 
-// Initialize 初始化设备服务，注入SDK、注册通道等。
+// Initialize 初始化设备服务
+/*
+在 Initialize 方法执行时：
+设备配置文件（如 devices.yaml）尚未加载，设备实例还未添加到 EdgeX 中，只能访问服务级别的配置，不能访问具体的设备配置
+*/
 func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	d.sdk = sdk
 	d.logger = sdk.LoggingClient()
 	d.asyncCh = sdk.AsyncValuesChannel()
 	d.deviceCh = sdk.DiscoveredDeviceChannel()
-
-	// 获取串口配置
-	device_cfg, err := sdk.GetDeviceByName("device-ble")
-	ser_cfg := serial.Config{}
-	for _, protocol := range device_cfg.Protocols {
-		ser_cfg.Name = fmt.Sprintf("%v", protocol["deviceLocation"])
-		ser_cfg.Baud, _ = cast.ToIntE(protocol["baudRate"])
-		ser_cfg.ReadTimeout = time.Duration(cast.ToInt(protocol["readTimeout"])) * time.Microsecond
-	}
-	// 初始化串口
-	serialPort, err := uart.NewSerialPort(ser_cfg, d.logger)
-	if err != nil {
-		log.Fatal("创建串口实例失败:", err)
-	}
-	// 初始化串口队列，注册Driver回调
-	serialQueue := uart.NewSerialQueue(
-		serialPort,
-		d.logger,
-		func(cmd string) { d.HandleUpCommandCallback(cmd) },
-		func(data string) { d.HandleUpAgentCallback(data) },
-		5,
-	)
-
-	// 初始化BLE控制器
-	bleController := ble.NewBLEController(serialPort, serialQueue, d.logger)
-
-	// 初始化BLE设备为外围设备模式
-	if err := bleController.InitializeAsPeripheral(); err != nil {
-		log.Fatal("BLE设备初始化失败:", err)
-	}
-
-	// 加载自定义MQTT配置
-	cfg, err := config.LoadConfig("./res/configuration.yaml")
-	if err != nil {
-		log.Fatal("MessageBusClient 获取自定义配置失败:", err)
-	}
-	// 初始化消息总线
-	mqttClient, err := mqttbus.NewEdgexMessageBusClient(cfg, d.logger)
-	if err != nil {
-		log.Fatal("MessageBusClient 创建失败:", err)
-	}
-
-	// 初始化业务服务
-	commandService := &CommandService{
-		Logger:           d.logger,
-		MessageBusClient: mqttClient,
-		BleController:    bleController,
-	}
-	agentService := &AgentService{
-		Logger:           d.logger,
-		MessageBusClient: mqttClient,
-	}
-
-	// 注入依赖到Driver
-	d.BleController = bleController
-	d.MessageBusClient = mqttClient
-	d.CommandService = commandService
-	d.AgentService = agentService
-
-	if d.BleController == nil || d.MessageBusClient == nil {
-		return fmt.Errorf("依赖未注入")
-	}
-	if err := d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown); err != nil { // 转发下行数据
-		d.logger.Errorf("【透明代理（↓）】 订阅下行总线失败 err: %v", err)
-	}
 	return nil
 }
 
@@ -241,17 +181,91 @@ func (d *Driver) Stop(force bool) error {
 // AddDevice 添加设备回调函数。
 func (d *Driver) AddDevice(deviceName string, protocols map[string]models.ProtocolProperties, adminState models.AdminState) error {
 	d.logger.Debugf("新设备已添加: %s", deviceName)
+
+	// 获取 UART 配置信息
+	// 通过结构体字段访问 Protocols
+	var deviceLocation string
+	var baudRate int
+
+	for i, protocol := range protocols {
+		deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
+		baudRate, _ = cast.ToIntE(protocol["baudRate"])
+		d.logger.Debugf("Driver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v timeout=%v", i, deviceLocation, baudRate)
+	}
+
+	serialPort, err := uart.NewSerialPort(serial.Config{
+		Name:        deviceLocation,
+		Baud:        baudRate,
+		ReadTimeout: time.Duration(10) * time.Millisecond,
+	}, d.logger)
+	if err != nil {
+		log.Fatal("创建串口实例失败:", err)
+	}
+	// 初始化串口队列，注册Driver回调
+	serialQueue := uart.NewSerialQueue(
+		serialPort,
+		d.logger,
+		func(cmd string) { d.HandleUpCommandCallback(cmd) },
+		func(data string) { d.HandleUpAgentCallback(data) },
+		5,
+	)
+
+	// 初始化BLE控制器
+	bleController := ble.NewBLEController(serialPort, serialQueue, d.logger)
+
+	// 初始化BLE设备为外围设备模式
+	if err := bleController.InitializeAsPeripheral(); err != nil {
+		log.Fatal("BLE设备初始化失败:", err)
+	}
+
+	// 加载自定义MQTT配置
+	cfg, err := config.LoadConfig("./res/configuration.yaml")
+	if err != nil {
+		log.Fatal("MessageBusClient 获取自定义配置失败:", err)
+	}
+	d.logger.Debugf("自定义Mqtt服务配置: %v\n", cfg)
+	// 初始化消息总线
+	mqttClient, err := mqttbus.NewEdgexMessageBusClient(cfg, d.logger)
+	if err != nil {
+		log.Fatal("MessageBusClient 创建失败:", err)
+	}
+
+	// 初始化业务服务
+	commandService := &CommandService{
+		Logger:           d.logger,
+		MessageBusClient: mqttClient,
+		BleController:    bleController,
+	}
+	agentService := &AgentService{
+		Logger:           d.logger,
+		MessageBusClient: mqttClient,
+	}
+
+	// 注入依赖到Driver
+	d.BleController = bleController
+	d.MessageBusClient = mqttClient
+	d.CommandService = commandService
+	d.AgentService = agentService
+
+	if d.BleController == nil || d.MessageBusClient == nil {
+		return fmt.Errorf("依赖未注入")
+	}
+	if err := d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown); err != nil { // 转发下行数据
+		d.logger.Errorf("【透明代理（↓）】 订阅下行总线失败 err: %v", err)
+	}
 	return nil
 }
 
 // UpdateDevice 更新设备回调函数。
 func (d *Driver) UpdateDevice(deviceName string, protocols map[string]models.ProtocolProperties, adminState models.AdminState) error {
 	d.logger.Debugf("设备 %s 已更新", deviceName)
+
 	return nil
 }
 
 // RemoveDevice 移除设备回调函数。
 func (d *Driver) RemoveDevice(deviceName string, protocols map[string]models.ProtocolProperties) error {
 	d.logger.Debugf("设备 %s 已移除", deviceName)
+
 	return nil
 }
