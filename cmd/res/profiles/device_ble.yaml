@@ -17,7 +17,7 @@ deviceResources:
 -
     name: "GetBLEADDR"
     isHidden: false
-    description: "Get VERSION"
+    description: "Get BLEADDR"
     attributes: { type: "ble", timeout: 1000}
     properties:
         valueType: "String"
@@ -26,7 +26,7 @@ deviceResources:
     name: "Setting&&PeripheralInit"
     isHidden: false
     description: "BLE Setting and Peripheral Init, e.g., {BleName:<string>}"
-    attributes: { type: "ble", timeout: 1000}
+    attributes: { type: "ble"}
     properties:
       valueType: "Object"
       readWrite: "W"
@@ -35,7 +35,7 @@ deviceResources:
     name: "SendString"
     isHidden: false
     description: "Send String"
-    attributes: { type: "ble", timeout: 1000}
+    attributes: { type: "ble"}
     properties:
         valueType: "String"
         readWrite: "W"
@@ -44,7 +44,7 @@ deviceResources:
     name: "SetTxPower"
     isHidden: false
     description: "Set TXPOWER"
-    attributes: { type: "ble", timeout: 1000}
+    attributes: { type: "ble"}
     properties:
         valueType: "Int8"
         readWrite: "W"
@@ -53,11 +53,18 @@ deviceResources:
     name: "SetBaud"
     isHidden: false
     description: "Set SetBaud"
-    attributes: { type: "ble", timeout: 1000}
+    attributes: { type: "ble"}
     properties:
         valueType: "Int64"
         readWrite: "W"
 
+-   name: "ReStart"
+    isHidden: false
+    description: "ReStart"
+    attributes: { type: "ble"}
+    properties:
+        valueType: "String"
+        readWrite: "R"
 # deviceCommands:
 #   -
 #     name: "GetCMD"

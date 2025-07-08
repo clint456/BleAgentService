@@ -24,7 +24,7 @@ func ParseDeviceLists(envelope *types.MessageEnvelope) ([]byte, error) {
 	// 断言 Payload 为 map[string]interface{}
 	payload, ok := envelope.Payload.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("payload is not a map")
+		return nil, fmt.Errorf("payload is not a map, payload : %v \n", envelope.Payload)
 	}
 
 	// 提取 deviceCoreCommands

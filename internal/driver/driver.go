@@ -27,12 +27,10 @@ import (
 	"log"
 
 	"device-ble/pkg/ble"
-	"device-ble/pkg/dataparse"
 	"device-ble/pkg/mqttbus"
 	"device-ble/pkg/uart"
 	errorDefault "errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/spf13/cast"
@@ -41,7 +39,6 @@ import (
 	dsModels "github.com/edgexfoundry/device-sdk-go/v4/pkg/models"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
-	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 	"github.com/tarm/serial"
 )
 
@@ -60,9 +57,6 @@ type Driver struct {
 	// 业务服务
 	CommandService *CommandService
 	AgentService   *AgentService
-
-	// 内部状态
-	commandResponses sync.Map
 }
 
 // Initialize 初始化设备服务
@@ -78,125 +72,28 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	return nil
 }
 
-// HandleUpAgentCallback 处理上行透明代理数据回调。
-func (d *Driver) HandleUpAgentCallback(data string) {
-	if d.AgentService != nil {
-		d.AgentService.HandleAgentData(data)
-	}
-}
-
-// HandleUpCommandCallback 处理上行命令回调。
-func (d *Driver) HandleUpCommandCallback(cmd string) {
-	if d.CommandService != nil {
-		d.CommandService.HandleCommand(cmd)
-	}
-}
-
 // Start 启动设备服务。
 func (d *Driver) Start() error {
-	return nil
-}
-
-// agentDown 处理蓝牙透明代理下行数据。
-func (d *Driver) agentDown(topic string, envelope types.MessageEnvelope) error {
-	if err := dataparse.SendToBlE(d.BleController, envelope); err != nil {
-		d.logger.Infof("【透明代理（↓）】下行数据发送失败 ❌, err: %v", err) // 记录成功日志
-	}
-	d.logger.Infof("【透明代理（↓）】下行数据发送成功 ✔, err: %v") // 记录成功日志
-	return nil
-}
-
-// Discover 触发协议特定的设备发现。
-func (s *Driver) Discover() error {
-	return fmt.Errorf("Discover function is yet to be implemented!")
-
-}
-
-// ValidateDevice 校验设备协议属性。
-func (s *Driver) ValidateDevice(device models.Device) error {
-
-	protocol, ok := device.Protocols["UART"]
-	if !ok {
-		return errorDefault.New("Missing 'UART' protocols")
-	}
-
-	deviceLocation, ok := protocol["deviceLocation"]
-	if !ok {
-		return errorDefault.New("Missing 'deviceLocation' information")
-	} else if deviceLocation == "" {
-		return errorDefault.New("deviceLocation must not empty")
-	}
-
-	baudRate, ok := protocol["baudRate"]
-	if !ok {
-		return errorDefault.New("Missing 'baudRate' information")
-	} else if baudRate == "" {
-		return errorDefault.New("baudRate must not empty")
-	}
-
-	return nil
-}
-
-// Stop 停止设备服务，释放资源。
-func (d *Driver) Stop(force bool) error {
-	if d.logger != nil {
-		d.logger.Infof("正在停止BLE代理服务 (force=%v)", force)
-	}
-
-	// 关闭MessageBus客户端
-	if d.MessageBusClient != nil {
-		if closer, ok := d.MessageBusClient.(interface{ Disconnect() error }); ok {
-			err := closer.Disconnect()
-			if err != nil {
-				d.logger.Errorf("MessageBus客户端关闭失败: %v", err)
-			} else {
-				d.logger.Debug("MessageBus客户端已断开连接")
-			}
-		} else {
-			d.logger.Debug("MessageBus客户端不支持关闭操作")
-		}
-	}
-
-	// 关闭BLE控制器和串口
-	if d.BleController != nil {
-		if closer, ok := d.BleController.(interface{ Close() error }); ok {
-			err := closer.Close()
-			if err != nil {
-				d.logger.Errorf("BLE控制器关闭失败: %v", err)
-			} else {
-				d.logger.Debug("BLE控制器已关闭")
-			}
-		} else {
-			d.logger.Debug("BLE控制器不支持关闭操作")
-		}
-	}
-
-	if d.logger != nil {
-		d.logger.Info("BLE代理服务已停止")
-	}
-
-	return nil
-}
-
-// AddDevice 添加设备回调函数。
-func (d *Driver) AddDevice(deviceName string, protocols map[string]models.ProtocolProperties, adminState models.AdminState) error {
-	d.logger.Debugf("新设备已添加: %s", deviceName)
-
 	// 获取 UART 配置信息
 	// 通过结构体字段访问 Protocols
 	var deviceLocation string
 	var baudRate int
-
-	for i, protocol := range protocols {
+	var readTimeout int
+	uartConfig, err := d.sdk.GetDeviceByName("device-ble")
+	if err != nil {
+		d.logger.Errorf("加载服务配置失败！")
+	}
+	for i, protocol := range uartConfig.Protocols {
 		deviceLocation = fmt.Sprintf("%v", protocol["deviceLocation"])
 		baudRate, _ = cast.ToIntE(protocol["baudRate"])
-		d.logger.Debugf("Driver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v timeout=%v", i, deviceLocation, baudRate)
+		readTimeout, _ = cast.ToIntE(protocol["readTimeout"])
+		d.logger.Debugf("Driver.HandleReadCommands(): protocol = %v, device location = %v, baud rate = %v readTimeout=%v", i, deviceLocation, baudRate, readTimeout)
 	}
 
 	serialPort, err := uart.NewSerialPort(serial.Config{
 		Name:        deviceLocation,
 		Baud:        baudRate,
-		ReadTimeout: time.Duration(10) * time.Millisecond,
+		ReadTimeout: time.Duration(readTimeout) * time.Millisecond,
 	}, d.logger)
 	if err != nil {
 		log.Fatal("创建串口实例失败:", err)
@@ -250,9 +147,95 @@ func (d *Driver) AddDevice(deviceName string, protocols map[string]models.Protoc
 	if d.BleController == nil || d.MessageBusClient == nil {
 		return fmt.Errorf("依赖未注入")
 	}
-	if err := d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown); err != nil { // 转发下行数据
+	if err := d.MessageBusClient.Subscribe(TopicBLEDown, d.AgentDown); err != nil { // 转发下行数据
 		d.logger.Errorf("【透明代理（↓）】 订阅下行总线失败 err: %v", err)
 	}
+	// 目前还未订阅过响应主题
+	d.CommandService.IsSubscribeResponse = false
+	return nil
+}
+
+// Discover 触发协议特定的设备发现。
+func (s *Driver) Discover() error {
+	return fmt.Errorf("Discover function is yet to be implemented!")
+
+}
+
+// ValidateDevice 校验设备协议属性。
+func (s *Driver) ValidateDevice(device models.Device) error {
+
+	protocol, ok := device.Protocols["UART"]
+	if !ok {
+		return errorDefault.New("Missing 'UART' protocols")
+	}
+
+	deviceLocation, ok := protocol["deviceLocation"]
+	if !ok {
+		return errorDefault.New("Missing 'deviceLocation' information")
+	} else if deviceLocation == "" {
+		return errorDefault.New("deviceLocation must not empty")
+	}
+
+	baudRate, ok := protocol["baudRate"]
+	if !ok {
+		return errorDefault.New("Missing 'baudRate' information")
+	} else if baudRate == "" {
+		return errorDefault.New("baudRate must not empty")
+	}
+
+	readTimeout, ok := protocol["readTimeout"]
+	if !ok {
+		return errorDefault.New("Missing 'readTimeout' information")
+	} else if readTimeout == "" {
+		return errorDefault.New("readTimeout must not empty")
+	}
+	return nil
+}
+
+// Stop 停止设备服务，释放资源。
+func (d *Driver) Stop(force bool) error {
+	if d.logger != nil {
+		d.logger.Infof("正在停止BLE代理服务 (force=%v)", force)
+	}
+
+	// 关闭MessageBus客户端
+	if d.MessageBusClient != nil {
+		if closer, ok := d.MessageBusClient.(interface{ Disconnect() error }); ok {
+			err := closer.Disconnect()
+			if err != nil {
+				d.logger.Errorf("MessageBus客户端关闭失败: %v", err)
+			} else {
+				d.logger.Debug("MessageBus客户端已断开连接")
+			}
+		} else {
+			d.logger.Debug("MessageBus客户端不支持关闭操作")
+		}
+	}
+
+	// 关闭BLE控制器和串口
+	if d.BleController != nil {
+		if closer, ok := d.BleController.(interface{ Close() error }); ok {
+			err := closer.Close()
+			if err != nil {
+				d.logger.Errorf("BLE控制器关闭失败: %v", err)
+			} else {
+				d.logger.Debug("BLE控制器已关闭")
+			}
+		} else {
+			d.logger.Debug("BLE控制器不支持关闭操作")
+		}
+	}
+
+	if d.logger != nil {
+		d.logger.Info("BLE代理服务已停止")
+	}
+
+	return nil
+}
+
+// AddDevice 添加设备回调函数。
+func (d *Driver) AddDevice(deviceName string, protocols map[string]models.ProtocolProperties, adminState models.AdminState) error {
+	d.logger.Debugf("新设备已添加: %s", deviceName)
 	return nil
 }
 

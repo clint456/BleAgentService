@@ -163,10 +163,7 @@ func (c *Client) Request(topic string, data interface{}) (types.MessageEnvelope,
 		return resp, nil
 	case <-time.After(c.timeout):
 		c.lc.Warnf("请求超时: %s", reqID)
-		go func(id string) {
-			time.Sleep(2 * time.Second)
-			c.responseChMap.Delete(id)
-		}(reqID)
+		c.responseChMap.Delete(reqID)
 		return types.MessageEnvelope{}, fmt.Errorf("请求超时: %s", reqID)
 	}
 }
@@ -177,7 +174,7 @@ func (c *Client) Subscribe(topic string, handler MessageHandler) error {
 	}
 	topicChannel := types.TopicChannel{
 		Topic:    topic,
-		Messages: make(chan types.MessageEnvelope, 100),
+		Messages: make(chan types.MessageEnvelope, 1),
 	}
 	if err := c.client.Subscribe([]types.TopicChannel{topicChannel}, c.errorChan); err != nil {
 		return err
@@ -201,7 +198,7 @@ func (c *Client) SubscribeResponse(topic string) error {
 
 	topicChannel := types.TopicChannel{
 		Topic:    topic,
-		Messages: make(chan types.MessageEnvelope, 100),
+		Messages: make(chan types.MessageEnvelope, 1),
 	}
 	if err := c.client.Subscribe([]types.TopicChannel{topicChannel}, c.errorChan); err != nil {
 		return err
@@ -243,11 +240,6 @@ func (c *Client) handleResponseMessages(topic string, ch chan types.MessageEnvel
 			if !ok {
 				return
 			}
-			if _, handled := c.handledReqID.LoadOrStore(msg.RequestID, struct{}{}); handled {
-				c.lc.Debugf("重复响应已处理: %s", msg.RequestID)
-				continue
-			}
-
 			val, exists := c.responseChMap.Load(msg.RequestID)
 			if !exists {
 				c.lc.Debugf("未匹配的响应: %s（可能已超时）", msg.RequestID)
@@ -264,7 +256,7 @@ func (c *Client) handleResponseMessages(topic string, ch chan types.MessageEnvel
 			select {
 			case respCh <- msg:
 				// 成功发送，不立即删除
-			default:
+			default: //装不进respCh就代表通道已满
 				c.lc.Warnf("响应通道已满: %s", msg.RequestID)
 				c.responseChMap.Delete(msg.RequestID)
 			}

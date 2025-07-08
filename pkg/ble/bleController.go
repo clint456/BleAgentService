@@ -138,16 +138,9 @@ func (c *BLEController) SendSingleWithResponse(cmd string) (res string, err erro
 		} else if strings.Contains(response, "ERROR") {
 			c.logger.Errorf("⛔️  发送 %q 失败: %q , 回显： %v ", cmd, err, response)
 		} else {
-			c.logger.Warnf("❗❓  未知回显, response:%v", response)
+			c.logger.Warnf(" 指令发送响应 response: %v", response)
 		}
 	}
 	c.logger.Info("BLE 单条指令发送成功")
 	return response, nil
 }
-
-// // 获取一次响应
-// // 对于获取版本、地址，一般都是先发OK，第二次响应才是内容
-// // 所以需要再获取一行响应，以获得实际内容
-// func (c *BLEController) GetOnceResponse() (res string, err error) {
-// 	return c.Queue.GetResponse(2 * time.Second)
-// }

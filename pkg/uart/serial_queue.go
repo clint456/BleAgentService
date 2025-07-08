@@ -225,7 +225,7 @@ func (q *SerialQueue) startReaderLoop() {
 						q.pendingRequests = q.pendingRequests[1:]
 					} else {
 						// 收到终止响应但没有挂起请求
-						q.logger.Warnf("收到意外终止响应: %s，但无挂起请求", line)
+						q.logger.Warnf("收到非用户请求响应: %s", line)
 					}
 				} else {
 					if q.upAgentCallback != nil {

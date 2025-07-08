@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
+	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
 )
 
 const (
@@ -19,19 +20,30 @@ const (
 	TopicReadingReq   = "edgex/core/command/request"
 )
 
+// ========================	运维命令服务  ========================
+
 // CommandService 负责上行命令分发和业务处理。
 type CommandService struct {
-	Logger           logger.LoggingClient
-	MessageBusClient interfaces.MessageBusClient
-	BleController    interfaces.BLEController
+	Logger              logger.LoggingClient
+	MessageBusClient    interfaces.MessageBusClient
+	BleController       interfaces.BLEController
+	IsSubscribeResponse bool
 }
 
 // HandleCommand 处理命令分发。
 func (cs *CommandService) HandleCommand(cmd string) {
+	if !cs.IsSubscribeResponse { //还未订阅过响应主题
+		cs.Logger.Infof("【运维】准备订阅响应主题: %s", TopicResponse)
+		if err := cs.MessageBusClient.SubscribeResponse(TopicResponse); err != nil {
+			cs.Logger.Errorf("订阅响应失败: %v", err)
+		}
+		cs.Logger.Infof("【运维】订阅响应成功: %s", TopicResponse)
+		cs.IsSubscribeResponse = true
+	}
 	if strings.Contains(cmd, "allstatus") {
 		// cmd数据格式：+COMMAND:allstatus
 		cs.Logger.Infof("【运维 — allstatus】开始查询所有设备状态")
-		data, err := cs.requestAndParseAll(TopicAllStatusReq, TopicResponse, 5*time.Second)
+		data, err := cs.requestAndParseAll(TopicAllStatusReq, 300*time.Millisecond)
 		if err != nil {
 			cs.Logger.Errorf("【运维 — allstatus 请求&解析失败: %v", err)
 			return
@@ -55,7 +67,7 @@ func (cs *CommandService) HandleCommand(cmd string) {
 			cs.Logger.Infof("【运维 — monitor】 device: %s, resource: %s\n", deviceName, resourceName)
 			cs.Logger.Infof("【运维 — monitor】开始监控指定设备数据")
 			TopicReadingRequest := fmt.Sprintf("%s/%s/%s/%s", TopicReadingReq, deviceName, resourceName, "get")
-			data, err := cs.requestAndParseReading(TopicReadingRequest, TopicResponse, 5*time.Second)
+			data, err := cs.requestAndParseReading(TopicReadingRequest, 100*time.Millisecond)
 			if err != nil {
 				cs.Logger.Errorf("【运维 —  monitor】 请求&解析失败: %v", err)
 				return
@@ -83,17 +95,8 @@ func (cs *CommandService) HandleCommand(cmd string) {
 
 func (cs *CommandService) requestAndParseAll(
 	reqTopic string,
-	respTopic string,
 	timeout time.Duration,
 ) (interface{}, error) {
-
-	cs.Logger.Infof("【运维】准备订阅响应主题: %s", respTopic)
-	if err := cs.MessageBusClient.SubscribeResponse(respTopic); err != nil {
-		cs.Logger.Errorf("订阅响应失败: %v", err)
-		return nil, err
-	}
-	cs.Logger.Infof("【运维】订阅响应成功: %s", respTopic)
-
 	cs.MessageBusClient.SetTimeout(timeout)
 
 	resp, err := cs.MessageBusClient.Request(reqTopic, "")
@@ -113,17 +116,8 @@ func (cs *CommandService) requestAndParseAll(
 
 func (cs *CommandService) requestAndParseReading(
 	reqTopic string,
-	respTopic string,
 	timeout time.Duration,
 ) (interface{}, error) {
-
-	cs.Logger.Infof("【运维】准备订阅响应主题: %s", respTopic)
-	if err := cs.MessageBusClient.SubscribeResponse(respTopic); err != nil {
-		cs.Logger.Errorf("订阅响应失败: %v", err)
-		return nil, err
-	}
-	cs.Logger.Infof("【运维】订阅响应成功: %s", respTopic)
-
 	cs.MessageBusClient.SetTimeout(timeout)
 
 	resp, err := cs.MessageBusClient.Request(reqTopic, "")
@@ -139,6 +133,31 @@ func (cs *CommandService) requestAndParseReading(
 		return nil, err
 	}
 	return data, nil
+}
+
+// ========================	透明代理服务  ========================
+
+// HandleUpAgentCallback 处理上行透明代理数据回调。
+func (d *Driver) HandleUpAgentCallback(data string) {
+	if d.AgentService != nil {
+		d.AgentService.HandleAgentData(data)
+	}
+}
+
+// HandleUpCommandCallback 处理上行命令回调。
+func (d *Driver) HandleUpCommandCallback(cmd string) {
+	if d.CommandService != nil {
+		d.CommandService.HandleCommand(cmd)
+	}
+}
+
+// AgentDown 处理蓝牙透明代理下行数据。
+func (d *Driver) AgentDown(topic string, envelope types.MessageEnvelope) error {
+	if err := dataparse.SendToBlE(d.BleController, envelope); err != nil {
+		d.logger.Infof("【透明代理（↓）】下行数据发送失败 ❌, err: %v", err) // 记录成功日志
+	}
+	d.logger.Infof("【透明代理（↓）】下行数据发送成功 ✔, err: %v") // 记录成功日志
+	return nil
 }
 
 // AgentService 负责透明代理上行数据处理。

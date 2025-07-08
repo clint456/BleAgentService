@@ -50,7 +50,13 @@ func (d *Driver) HandleReadCommands(
 				return nil, err
 			}
 			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, common.ValueTypeString, res)
-
+		case "ReStart":
+			d.Stop(true)
+			d.Start()
+			if err != nil {
+				log.Fatal("服务重启失败:", err)
+			}
+			cv, err = dsModels.NewCommandValue(req.DeviceResourceName, common.ValueTypeString, "重启服务成功")
 		}
 		responses = append(responses, cv)
 	}

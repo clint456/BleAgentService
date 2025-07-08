@@ -40,6 +40,6 @@ MQTTUserClient:
   port: 1883
   protocol: "tcp"
   clientID: "ble-client"  
-  qos: 1
+  qos: 0
   username: ""
   password: ""
