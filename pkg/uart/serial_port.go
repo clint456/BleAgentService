@@ -2,7 +2,6 @@ package uart
 
 import (
 	"bufio"
-	"device-ble/internal/interfaces"
 	"fmt"
 	"io"
 	"strings"
@@ -29,12 +28,12 @@ type SerialPort struct {
 // 返回:
 //   - *SerialPort: 新创建的串口实例
 //   - error: 初始化过程中的错误（如果有）
-func NewSerialPort(cfg interfaces.SerialConfig, logger logger.LoggingClient) (*SerialPort, error) {
+func NewSerialPort(logger logger.LoggingClient) (*SerialPort, error) {
 	// 创建串口配置
 	c := &serial.Config{
-		Name:        cfg.PortName,                   // 串口名称（如 COM1 或 /dev/ttyUSB0）
-		Baud:        cfg.BaudRate,                   // 波特率
-		ReadTimeout: time.Duration(cfg.ReadTimeout), // 读取超时时间
+		Name:        "/dev/ttyS3",      // 串口名称
+		Baud:        115200,            // 波特率
+		ReadTimeout: time.Duration(10), // 读取超时时间
 	}
 
 	// 打开串口连接
@@ -50,8 +49,6 @@ func NewSerialPort(cfg interfaces.SerialConfig, logger logger.LoggingClient) (*S
 		logger: logger,                // 设置日志记录器
 	}
 
-	// 记录串口打开成功的日志
-	logger.Infof("串口已打开: %s, 波特率: %d", cfg.PortName, cfg.BaudRate)
 	return sp, nil
 }
 

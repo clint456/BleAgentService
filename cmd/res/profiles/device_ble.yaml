@@ -67,5 +67,3 @@ deviceResources:
 #       - { deviceResource: "GetVERSION", defaultValue: "0.0" }
 #       - { deviceResource: "GetBLEADDR", defaultValue: "0.0.0.0" }
 
-
-

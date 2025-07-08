@@ -10,8 +10,4 @@ deviceList:
       UART:
         deviceLocation: "/dev/ttyS3"
         baudRate: 115200
-    # autoEvents:
-    #   - interval: 5s
-    #     onChange: false
-    #     sourceName: GetVERSION
 

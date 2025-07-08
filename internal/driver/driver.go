@@ -23,8 +23,12 @@ package driver
 
 import (
 	internalif "device-ble/internal/interfaces"
+	"log"
 
+	"device-ble/pkg/ble"
 	"device-ble/pkg/dataparse"
+	"device-ble/pkg/mqttbus"
+	"device-ble/pkg/uart"
 	errorDefault "errors"
 	"fmt"
 	"sync"
@@ -43,8 +47,6 @@ type Driver struct {
 	logger   logger.LoggingClient
 	asyncCh  chan<- *dsModels.AsyncValues
 	deviceCh chan<- []dsModels.DiscoveredDevice
-	// 服务配置
-	Config internalif.ConfigProvider
 
 	// 核心组件
 	BleController    internalif.BLEController
@@ -65,7 +67,52 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	d.asyncCh = sdk.AsyncValuesChannel()
 	d.deviceCh = sdk.DiscoveredDeviceChannel()
 
-	if d.Config == nil || d.BleController == nil || d.MessageBusClient == nil {
+	// 初始化串口
+	serialPort, err := uart.NewSerialPort(d.logger)
+	if err != nil {
+		log.Fatal("创建串口实例失败:", err)
+	}
+	// 初始化串口队列，注册Driver回调
+	serialQueue := uart.NewSerialQueue(
+		serialPort,
+		d.logger,
+		func(cmd string) { d.HandleUpCommandCallback(cmd) },
+		func(data string) { d.HandleUpAgentCallback(data) },
+		5,
+	)
+
+	// 初始化BLE控制器
+	bleController := ble.NewBLEController(serialPort, serialQueue, d.logger)
+
+	// 初始化BLE设备为外围设备模式
+	if err := bleController.InitializeAsPeripheral(); err != nil {
+		log.Fatal("BLE设备初始化失败:", err)
+	}
+
+	// 初始化消息总线
+	mqttClient, err := mqttbus.NewEdgexMessageBusClient(d.logger)
+	if err != nil {
+		log.Fatal("MessageBusClient 创建失败:", err)
+	}
+
+	// 初始化业务服务
+	commandService := &CommandService{
+		Logger:           d.logger,
+		MessageBusClient: mqttClient,
+		BleController:    bleController,
+	}
+	agentService := &AgentService{
+		Logger:           d.logger,
+		MessageBusClient: mqttClient,
+	}
+
+	// 注入依赖到Driver
+	d.BleController = bleController
+	d.MessageBusClient = mqttClient
+	d.CommandService = commandService
+	d.AgentService = agentService
+
+	if d.BleController == nil || d.MessageBusClient == nil {
 		return fmt.Errorf("依赖未注入")
 	}
 	if err := d.MessageBusClient.Subscribe(TopicBLEDown, d.agentDown); err != nil { // 转发下行数据

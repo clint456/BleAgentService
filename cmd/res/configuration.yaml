@@ -16,7 +16,7 @@ Device:
 
 MQTTBrokerInfo:
   Schema: "tcp"
-  Host: "192.168.8.196"
+  Host: "localhost"
   Port: 1883
   Qos: 0
   KeepAlive: 3600
@@ -33,6 +33,6 @@ MQTTBrokerInfo:
   IncomingTopic: "edgex/events/#"
 
   Writable:
-    ResponseFetchInterval: 500 # milliseconds
+    ResponseFetchInterval: 500 # milliseconds 
 
-
+MQTTClient:
