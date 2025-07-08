@@ -1,6 +1,7 @@
 package mqttbus
 
 import (
+	"device-ble/cmd/config"
 	"device-ble/pkg/messagebus"
 	"fmt"
 	"time"
@@ -17,16 +18,16 @@ type EdgexMessageBusClient struct {
 }
 
 // NewEdgexMessageBusClient 只负责初始化和连接，不注册 handler
-func NewEdgexMessageBusClient(logger logger.LoggingClient) (*EdgexMessageBusClient, error) {
+func NewEdgexMessageBusClient(cfg *config.MQTTUserClientConfig, logger logger.LoggingClient) (*EdgexMessageBusClient, error) {
 	config := messagebus.Config{
-		Host:     "172.16.19.153",
-		Port:     1883,
-		Protocol: "tcp",
+		Host:     cfg.MqttUserConfig.Host,
+		Port:     cfg.MqttUserConfig.Port,
+		Protocol: cfg.MqttUserConfig.Protocol,
 		Type:     "mqtt",
-		ClientID: "ble-client",
-		QoS:      1,
-		Username: "",
-		Password: "",
+		ClientID: cfg.MqttUserConfig.ClientID,
+		QoS:      cfg.MqttUserConfig.QoS,
+		Username: cfg.MqttUserConfig.Username,
+		Password: cfg.MqttUserConfig.Password,
 	}
 	client, err := messagebus.NewClient(config, logger)
 	if err != nil {

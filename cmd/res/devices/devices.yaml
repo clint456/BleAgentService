@@ -10,4 +10,5 @@ deviceList:
       UART:
         deviceLocation: "/dev/ttyS3"
         baudRate: 115200
+        readTimeout: 10
 

@@ -35,4 +35,11 @@ MQTTBrokerInfo:
   Writable:
     ResponseFetchInterval: 500 # milliseconds 
 
-MQTTClient:
+MQTTUserClient:
+  host: "172.16.19.153"
+  port: 1883
+  protocol: "tcp"
+  clientID: "ble-client"  
+  qos: 1
+  username: ""
+  password: ""

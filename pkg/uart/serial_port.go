@@ -6,7 +6,6 @@ import (
 	"io"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/tarm/serial"
@@ -28,12 +27,12 @@ type SerialPort struct {
 // 返回:
 //   - *SerialPort: 新创建的串口实例
 //   - error: 初始化过程中的错误（如果有）
-func NewSerialPort(logger logger.LoggingClient) (*SerialPort, error) {
+func NewSerialPort(cfg serial.Config, logger logger.LoggingClient) (*SerialPort, error) {
 	// 创建串口配置
 	c := &serial.Config{
-		Name:        "/dev/ttyS3",      // 串口名称
-		Baud:        115200,            // 波特率
-		ReadTimeout: time.Duration(10), // 读取超时时间
+		Name:        cfg.Name,        // 串口名称
+		Baud:        cfg.Baud,        // 波特率
+		ReadTimeout: cfg.ReadTimeout, // 读取超时时间
 	}
 
 	// 打开串口连接

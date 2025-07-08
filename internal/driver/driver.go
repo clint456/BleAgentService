@@ -22,8 +22,10 @@
 package driver
 
 import (
+	"device-ble/cmd/config"
 	internalif "device-ble/internal/interfaces"
 	"log"
+	"time"
 
 	"device-ble/pkg/ble"
 	"device-ble/pkg/dataparse"
@@ -38,6 +40,8 @@ import (
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/clients/logger"
 	"github.com/edgexfoundry/go-mod-core-contracts/v4/models"
 	"github.com/edgexfoundry/go-mod-messaging/v4/pkg/types"
+	"github.com/spf13/cast"
+	"github.com/tarm/serial"
 )
 
 // Driver BLE代理服务驱动程序，协调各组件初始化和生命周期管理。
@@ -67,8 +71,16 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 	d.asyncCh = sdk.AsyncValuesChannel()
 	d.deviceCh = sdk.DiscoveredDeviceChannel()
 
+	// 获取串口配置
+	device_cfg, err := sdk.GetDeviceByName("device-ble")
+	ser_cfg := serial.Config{}
+	for _, protocol := range device_cfg.Protocols {
+		ser_cfg.Name = fmt.Sprintf("%v", protocol["deviceLocation"])
+		ser_cfg.Baud, _ = cast.ToIntE(protocol["baudRate"])
+		ser_cfg.ReadTimeout = time.Duration(cast.ToInt(protocol["readTimeout"])) * time.Microsecond
+	}
 	// 初始化串口
-	serialPort, err := uart.NewSerialPort(d.logger)
+	serialPort, err := uart.NewSerialPort(ser_cfg, d.logger)
 	if err != nil {
 		log.Fatal("创建串口实例失败:", err)
 	}
@@ -89,8 +101,13 @@ func (d *Driver) Initialize(sdk edgexif.DeviceServiceSDK) error {
 		log.Fatal("BLE设备初始化失败:", err)
 	}
 
+	// 加载自定义MQTT配置
+	cfg, err := config.LoadConfig("./res/configuration.yaml")
+	if err != nil {
+		log.Fatal("MessageBusClient 获取自定义配置失败:", err)
+	}
 	// 初始化消息总线
-	mqttClient, err := mqttbus.NewEdgexMessageBusClient(d.logger)
+	mqttClient, err := mqttbus.NewEdgexMessageBusClient(cfg, d.logger)
 	if err != nil {
 		log.Fatal("MessageBusClient 创建失败:", err)
 	}
