@@ -1,18 +1,26 @@
 # device-ble-go
 ## branch
-- v3.1  暂存已提交
-> 支持napa版本
-> 实现通过Edgex Ui控件触发蓝牙模块的基本操作、String、Json数据的收发
->
+- v3.1
+> - 支持napa版本
+> - 实现通过Edgex Ui控件触发蓝牙模块的基本操作、String、Json数据的收发
 
-- v4.0  暂存提交
-> 支持odassa版本
-> - 实现v3.1的功能
-> - 自动订阅edgex/events
-> - 将消息转发至 自定义消息主题: edgex/HyData/events/+/+/+
-> - 将消息下发至 Ble模块
-> 
+- v4.0
+> - 支持odassa版本
+> - 增加代理转发功能
 
-（计划完成）监听来自手机与messageBus上用户（edgex/HyCommand/+/+/+）的命令请求，并发送回应至手机或messagebus上的用户（edgex/HyResponse/+/+/+）
+- v4.1.0
+> - 支持odassa版本
+> - 增加蓝牙命令交互
+> - 优化代理转发功能
+
+- v4.1.1
+> - 支持odassa版本
+> - 增加接口、依赖注入设计模式
+> - 增加WebUi控制蓝牙设备
+
+- v4.1.2
+> - 支持odassa版本
+> - 更新uart、MqttLCient配置载入方式
+> - 增加ReStart控制资源
 
 [蓝牙调试助手smart-ble](https://github.com/LuoYaoSheng/smart-ble.git)
