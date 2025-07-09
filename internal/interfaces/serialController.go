@@ -2,8 +2,6 @@ package interfaces
 
 import "time"
 
-// BLEController 定义 BLE 控制器的通用接口
-// 只暴露需要跨包调用的方法
 // SerialQueue 定义串口队列的通用接口
 // 只暴露需要跨包调用的方法
 // SerialRequest 表示一个串口请求（命令 + 超时 + 响应通道）
@@ -73,16 +71,4 @@ type SerialQueueInterface interface {
 	// 返回值:
 	//   - error: 如果关闭串口时发生错误，返回非 nil 错误。
 	Close() error
-}
-
-// BLEController操作统一接口
-type BLEController interface {
-	Close() error
-	InitializeAsPeripheral() error
-	CustomInitializeBle(cmd []string) error
-	SendSingle(cmd string) error
-	SendMulti(cmds []string) error
-	SendSingleWithResponse(cmd string) (res string, err error)
-	SendJSONOverBLE(jsonData interface{}) error // 分包发送Json数据
-	GetQueue() SerialQueueInterface             // 返回串口队列，具体类型由实现决定
 }
