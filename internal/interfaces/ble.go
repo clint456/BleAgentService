@@ -28,8 +28,10 @@ type SerialPortInterface interface {
 	Close() error
 }
 
+// SerialQueueInterface 定义了一个串口命令发送和接收接口。
+// 该接口允许并发发送串口命令，并等待设备的响应。
 type SerialQueueInterface interface {
-	// SendCommand 发送串口命令并等待设备响应。支持并发发送
+	// SendCommand 发送串口命令并等待设备响应。支持并发发送。
 	//
 	// 参数:
 	//   - command: 要发送到串口设备的命令字节数组，不能为空。
@@ -46,11 +48,34 @@ type SerialQueueInterface interface {
 	//   - "请求队列已满": 如果在 queueTimeout 时间内无法将请求放入队列（最多重试 3 次）。
 	//   - "等待响应超时": 如果在 readDelay + timeout 时间内未收到设备响应。
 	SendCommand(command []byte, timeout, readDelay, queueTimeout time.Duration) (string, error)
+
+	// GetResponse 获取设备的响应数据。
+	// 如果在指定的超时时间内没有接收到响应，返回错误。
+	//
+	// 参数:
+	//   - timeout: 等待响应的最大时间。
+	//
+	// 返回值:
+	//   - string: 设备返回的响应数据。
+	//   - error: 如果没有接收到响应或发生错误，返回非 nil 错误。
 	GetResponse(timeout time.Duration) (string, error)
+
+	// GetPort 获取当前串口的接口。
+	// 返回当前使用的串口接口对象。
+	//
+	// 返回值:
+	//   - SerialPortInterface: 当前串口接口。
 	GetPort() SerialPortInterface
+
+	// Close 关闭串口连接。
+	// 在完成所有串口操作后调用此方法以释放资源。
+	//
+	// 返回值:
+	//   - error: 如果关闭串口时发生错误，返回非 nil 错误。
 	Close() error
 }
 
+// BLEController操作统一接口
 type BLEController interface {
 	Close() error
 	InitializeAsPeripheral() error
@@ -58,5 +83,6 @@ type BLEController interface {
 	SendSingle(cmd string) error
 	SendMulti(cmds []string) error
 	SendSingleWithResponse(cmd string) (res string, err error)
-	GetQueue() SerialQueueInterface // 返回串口队列，具体类型由实现决定
+	SendJSONOverBLE(sq SerialQueueInterface, jsonData interface{}) error // 分包发送Json数据
+	GetQueue() SerialQueueInterface                                      // 返回串口队列，具体类型由实现决定
 }

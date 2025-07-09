@@ -1,45 +1,52 @@
+# 可在运行时动态调整的参数
 Writable:
-  LogLevel: DEBUG
+  LogLevel: DEBUG   # 日志级别（DEBUG/INFO/WARN/ERROR）
 
+# 服务自身的网络绑定配置
 Service:
-  Host: localhost
-  Port: 59995
-  StartupMsg: ble-agent-service started
+  Host: localhost   # 该设备服务绑定的主机地址（一般为本地）
+  Port: 59995       # 该设备服务监听的端口
+  StartupMsg: ble-agent-service started  # 服务启动后的日志信息
+
+# 服务的遥测/指标统计设置
 Telemetry:
   Metrics: 
-    # All service's custom metric names must be present in this list. All common metric names are in the Common Config
-    ReadCommandsExecuted: true
+    # 所有自定义的遥测指标名称必须出现在该列表中。通用指标在 Common Config 中定义
+    ReadCommandsExecuted: true  # 启用读取命令执行次数的统计
+
+# 指定设备相关配置文件的目录
 Device:
-  # These have common values (currently), but must be here for service local env overrides to apply when customized
-  ProfilesDir: "./res/profiles"
-  DevicesDir: "./res/devices"
+  ProfilesDir: "./res/profiles"   # 存放设备 profile（功能定义）的目录
+  DevicesDir: "./res/devices"     # 存放设备实例定义文件的目录
 
+# 配置连接 EdgeX 消息总线（MessageBus，基于 MQTT）
 MQTTBrokerInfo:
-  Schema: "tcp"
-  Host: "localhost"
-  Port: 1883
-  Qos: 0
-  KeepAlive: 3600
-  ClientId: "device-ble-agent"
+  Schema: "tcp"             # 使用的协议（tcp）
+  Host: "localhost"         # MQTT Broker 地址（EdgeX 消息总线所在地址）
+  Port: 1883                # MQTT 端口（默认 1883）
+  Qos: 0                    # MQTT 消息的 QoS 等级（0 表示最多一次）
+  KeepAlive: 3600           # MQTT 连接保活时间（单位：秒）
+  ClientId: "device-ble-agent"  # 该服务在 MQTT 中的客户端 ID
 
-  CredentialsRetryTime: 120 # Seconds
-  CredentialsRetryWait: 1 # Seconds
-  ConnEstablishingRetry: 10
-  ConnRetryWaitTime: 5
+  CredentialsRetryTime: 120     # MQTT 认证失败后的重试总时长（秒）
+  CredentialsRetryWait: 1       # 每次重试之间的等待时间（秒）
+  ConnEstablishingRetry: 10     # 建立连接时的最大重试次数
+  ConnRetryWaitTime: 5          # 每次连接失败后等待时间（秒）
 
-  AuthMode: "none"
-  CredentialsName: "credentials"
+  AuthMode: "none"              # MQTT 认证方式（none 表示无认证）
+  CredentialsName: "credentials" # 若有认证，此为凭证名称（与安全服务集成时使用）
 
-  IncomingTopic: "edgex/events/#"
+  IncomingTopic: "edgex/events/#" # 订阅的消息主题，接收来自其他设备服务的事件数据
 
   Writable:
-    ResponseFetchInterval: 500 # milliseconds 
+    ResponseFetchInterval: 500  # MQTT 响应的轮询间隔时间（单位：毫秒）
 
+# 自定义 MQTT 客户端配置（用于与非 EdgeX 设备通信）
 MQTTUserClient:
-  host: "172.16.19.153"
-  port: 1883
-  protocol: "tcp"
-  clientID: "ble-client"  
-  qos: 0
-  username: ""
-  password: ""
+  host: "172.16.19.153"     # 外部 MQTT Broker 的地址（如实际设备所在网络）
+  port: 1883                # 该 MQTT Broker 的端口
+  protocol: "tcp"           # 协议（通常为 tcp）
+  clientID: "ble-client"    # 自定义 MQTT 客户端的 ID
+  qos: 0                    # MQTT 消息质量等级
+  username: ""              # 用户名（若使用认证）
+  password: ""              # 密码（若使用认证）

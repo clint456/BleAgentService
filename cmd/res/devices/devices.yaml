@@ -1,14 +1,13 @@
-# Pre-defined devices
+# 设备配置列表
 deviceList:
-  - name: "device-ble"
-    profileName: "device-ble"
-    description: "Example of device-ble"
-    labels:
+  - name: "device-ble"                # 设备名称，需全局唯一
+    profileName: "device-ble"         # 该设备关联的 Profile 名（定义该设备支持的资源和命令）
+    description: "Example of device-ble"  # 对设备的简要描述
+    labels:                           # 标签，可用于设备筛选与分类
       - uart
       - device-ble
-    protocols:
-      UART:
-        deviceLocation: "/dev/ttyS3"
-        baudRate: 115200
-        readTimeout: 10
-
+    protocols:                        # 协议定义（多个协议可并列定义）
+      UART:                           # 协议名称（在驱动中需要支持该协议类型）
+        deviceLocation: "/dev/ttyS3"  # 串口设备节点路径（物理连接地址）
+        baudRate: 115200              # 串口波特率
+        readTimeout: 10               # 读取超时时间（单位：毫秒）

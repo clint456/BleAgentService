@@ -127,6 +127,7 @@ func (c *BLEController) SendMulti(cmds []string) error {
 	return nil
 }
 
+// 发送单行带返回数据
 func (c *BLEController) SendSingleWithResponse(cmd string) (res string, err error) {
 	response, err := c.Queue.SendCommand([]byte(cmd), 300*time.Millisecond, 1*time.Millisecond, 100*time.Millisecond)
 	if err != nil {
