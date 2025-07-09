@@ -83,6 +83,6 @@ type BLEController interface {
 	SendSingle(cmd string) error
 	SendMulti(cmds []string) error
 	SendSingleWithResponse(cmd string) (res string, err error)
-	SendJSONOverBLE(sq SerialQueueInterface, jsonData interface{}) error // 分包发送Json数据
-	GetQueue() SerialQueueInterface                                      // 返回串口队列，具体类型由实现决定
+	SendJSONOverBLE(jsonData interface{}) error // 分包发送Json数据
+	GetQueue() SerialQueueInterface             // 返回串口队列，具体类型由实现决定
 }

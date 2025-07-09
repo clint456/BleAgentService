@@ -1,7 +1,6 @@
 package ble
 
 import (
-	"device-ble/internal/interfaces"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -49,7 +48,7 @@ func splitIntoPackets(data []byte) []Packet {
 }
 
 // SendJSONOverBLE 发送 JSON 数据的主要函数。
-func SendJSONOverBLE(sq interfaces.SerialQueueInterface, jsonData interface{}) error {
+func (c *BLEController) SendJSONOverBLE(jsonData interface{}) error {
 	// 这里需要传入logger参数，建议后续重构接口
 	// 目前先用fmt.Println模拟日志，后续可传入logger
 	tag := uuid.New().String()
@@ -66,7 +65,7 @@ func SendJSONOverBLE(sq interfaces.SerialQueueInterface, jsonData interface{}) e
 		copy(packetData[len(Prefix)+HeaderSize:], packet.Payload)
 		copy(packetData[len(Prefix)+HeaderSize+len(packet.Payload):], Suffix)
 
-		response, err := sq.SendCommand(packetData, 300*time.Millisecond, 1*time.Millisecond, 100*time.Millisecond)
+		response, err := c.GetQueue().SendCommand(packetData, 300*time.Millisecond, 1*time.Millisecond, 100*time.Millisecond)
 		if strings.Contains(response, "OK") {
 			fmt.Printf("⚡  数据包： %v  ⬇️ 子包：  %d/%d 发送成功, size：%d bytes\n", tag, packet.Index+1, packet.Total, len(packetData))
 		} else if strings.Contains(response, "ERROR") {

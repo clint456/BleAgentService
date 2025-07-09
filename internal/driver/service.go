@@ -2,7 +2,6 @@ package driver
 
 import (
 	"device-ble/internal/interfaces"
-	"device-ble/pkg/ble"
 	"device-ble/pkg/dataparse"
 	"fmt"
 	"strings"
@@ -48,7 +47,7 @@ func (cs *CommandService) HandleCommand(cmd string) {
 			cs.Logger.Errorf("【运维 — allstatus 请求&解析失败: %v", err)
 			return
 		}
-		err = ble.SendJSONOverBLE(cs.BleController.GetQueue(), data)
+		err = cs.BleController.SendJSONOverBLE(data)
 		data = nil
 		if err != nil {
 			cs.Logger.Errorf("【运维 — allstatus】发送响应失败: %v", err)
@@ -72,7 +71,7 @@ func (cs *CommandService) HandleCommand(cmd string) {
 				cs.Logger.Errorf("【运维 —  monitor】 请求&解析失败: %v", err)
 				return
 			}
-			err = ble.SendJSONOverBLE(cs.BleController.GetQueue(), data)
+			err = cs.BleController.SendJSONOverBLE(data)
 			data = nil
 			if err != nil {
 				cs.Logger.Errorf("【运维 —  monitor】发送响应失败: %v", err)
@@ -84,7 +83,7 @@ func (cs *CommandService) HandleCommand(cmd string) {
 		}
 	} else {
 		cs.Logger.Warnf("命名不支持！！")
-		err := ble.SendJSONOverBLE(cs.BleController.GetQueue(), "命名不支持！！")
+		err := cs.BleController.SendJSONOverBLE("命名不支持！！")
 		if err != nil {
 			cs.Logger.Errorf("【运维——status】发送响应失败: %v", err)
 			return
