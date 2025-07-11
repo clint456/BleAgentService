@@ -3,14 +3,15 @@ module device-ble
 go 1.24.3
 
 require (
-	github.com/edgexfoundry/device-sdk-go/v4 v4.1.0-dev.15
-	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.1.0-dev.14
+	github.com/edgexfoundry/device-sdk-go/v4 v4.1.0-dev.22
+	github.com/edgexfoundry/go-mod-bootstrap/v4 v4.1.0-dev.18
 	github.com/edgexfoundry/go-mod-core-contracts/v4 v4.1.0-dev.6
-	github.com/edgexfoundry/go-mod-messaging/v4 v4.1.0-dev.9
+	github.com/edgexfoundry/go-mod-messaging/v4 v4.1.0-dev.10
 	github.com/google/uuid v1.6.0
 	github.com/labstack/gommon v0.4.2
+	github.com/spf13/cast v1.9.2
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
-	gopkg.in/yaml.v3 v3.0.1
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -19,7 +20,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.5.0 // indirect
-	github.com/edgexfoundry/go-mod-configuration/v4 v4.1.0-dev.7 // indirect
+	github.com/edgexfoundry/go-mod-configuration/v4 v4.1.0-dev.9 // indirect
 	github.com/edgexfoundry/go-mod-registry/v4 v4.1.0-dev.3 // indirect
 	github.com/edgexfoundry/go-mod-secrets/v4 v4.1.0-dev.3 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
@@ -49,7 +50,6 @@ require (
 	github.com/go-resty/resty/v2 v2.16.5 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
-	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -81,7 +81,7 @@ require (
 	github.com/openziti/foundation/v2 v2.0.63 // indirect
 	github.com/openziti/identity v1.0.101 // indirect
 	github.com/openziti/metrics v1.4.1 // indirect
-	github.com/openziti/sdk-golang v1.1.1 // indirect
+	github.com/openziti/sdk-golang v1.1.2 // indirect
 	github.com/openziti/secretstream v0.1.34 // indirect
 	github.com/openziti/transport/v2 v2.0.171 // indirect
 	github.com/orcaman/concurrent-map/v2 v2.0.1 // indirect
@@ -94,7 +94,6 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/speps/go-hashids v2.0.0+incompatible // indirect
-	github.com/spf13/cast v1.9.2 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
@@ -103,24 +102,25 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
-	github.com/zitadel/oidc/v2 v2.12.2 // indirect
+	github.com/zitadel/logging v0.6.2 // indirect
+	github.com/zitadel/oidc/v3 v3.39.0 // indirect
+	github.com/zitadel/schema v1.3.1 // indirect
 	go.mongodb.org/mongo-driver v1.17.0 // indirect
 	go.mozilla.org/pkcs7 v0.9.0 // indirect
 	go.opentelemetry.io/otel v1.32.0 // indirect
 	go.opentelemetry.io/otel/metric v1.32.0 // indirect
 	go.opentelemetry.io/otel/trace v1.32.0 // indirect
-	golang.org/x/crypto v0.39.0 // indirect
-	golang.org/x/net v0.41.0 // indirect
+	golang.org/x/crypto v0.40.0 // indirect
+	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.15.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/term v0.33.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241202173237-19429a94021a // indirect
 	google.golang.org/grpc v1.70.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
-	gopkg.in/go-jose/go-jose.v2 v2.6.3 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	nhooyr.io/websocket v1.8.17 // indirect
 )
